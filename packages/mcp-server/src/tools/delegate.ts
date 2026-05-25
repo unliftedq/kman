@@ -52,7 +52,8 @@ interface DelegateResult {
   message: string;
   result?: unknown;
   session_id?: string;
-  exit_code?: number;
+  exit_code?: number | null;
+  exit_signal?: string | null;
   stderr?: string;
 }
 
@@ -124,7 +125,13 @@ export function registerDelegateTools(
 
 /** Sanitize peer name into a valid MCP tool identifier. */
 export function toolNameFor(peer: string): string {
-  return `delegate_${peer.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+  return `delegate_${Array.from(peer, encodeToolNameChar).join("")}`;
+}
+
+function encodeToolNameChar(char: string): string {
+  if (/^[a-zA-Z0-9-]$/.test(char)) return char;
+  if (char === "_") return "__";
+  return `_u${char.codePointAt(0)?.toString(16)}_`;
 }
 
 async function invokeDelegate(
@@ -206,8 +213,15 @@ async function invokeDelegate(
       stderr += c.toString("utf8");
     });
 
+    let settled = false;
+    const resolveOnce = (value: { content: { type: "text"; text: string }[]; isError?: boolean }) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
     child.once("error", (err) => {
-      resolve(
+      resolveOnce(
         wrap({
           ok: false,
           peer,
@@ -217,8 +231,8 @@ async function invokeDelegate(
       );
     });
 
-    child.once("exit", (code) => {
-      const exit = code ?? 0;
+    child.once("close", (code, signal) => {
+      const failedByExit = code !== 0 || signal !== null;
       // The child writes its JSON summary on stdout for `--output json`.
       let summary: Record<string, unknown> | null = null;
       const trimmed = stdout.trim();
@@ -230,16 +244,19 @@ async function invokeDelegate(
         }
       }
 
-      if (exit !== 0 || (summary && summary.reason === "error")) {
-        resolve(
+      if (failedByExit || (summary && summary.reason === "error")) {
+        const exitMessage =
+          code === null ? `signal ${signal ?? "unknown"}` : `code ${code}`;
+        resolveOnce(
           wrap({
             ok: false,
             peer,
-            message: `peer "${peer}" exited with code ${exit}${
+            message: `peer "${peer}" exited with ${exitMessage}${
               summary && typeof summary.error === "string" ? `: ${summary.error}` : ""
             }`,
             ...(summary?.session_id ? { session_id: String(summary.session_id) } : {}),
-            exit_code: exit,
+            exit_code: code,
+            exit_signal: signal,
             ...(stderr ? { stderr: stderr.slice(-2000) } : {}),
             ...(summary ? { result: summary } : {}),
           }),
@@ -247,13 +264,14 @@ async function invokeDelegate(
         return;
       }
 
-      resolve(
+      resolveOnce(
         wrap({
           ok: true,
           peer,
           message: `peer "${peer}" completed`,
           ...(summary?.session_id ? { session_id: String(summary.session_id) } : {}),
-          exit_code: exit,
+          exit_code: code,
+          exit_signal: signal,
           result: summary ?? trimmed,
         }),
       );

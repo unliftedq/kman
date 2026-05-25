@@ -24,7 +24,7 @@ function mapPermission(level: PermissionMode): string {
     case "ask":
       return "interactive";
     case "auto":
-      return "auto-edit";
+      return "auto_edit";
     case "yolo":
       return "yolo";
   }
