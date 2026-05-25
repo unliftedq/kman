@@ -74,11 +74,15 @@ export async function buildAgentContext(
   const sessionId = nowSessionId();
   const runId = randomUUID();
 
+  const runChain = currentRunChain(agentName);
+
   const mcpServers = resolveMcpServers({
     agentName,
     memoryEnabled,
     memoryPath: loc.memoryPath,
     memoryCharLimit: profile.memory.char_limit,
+    peerAgents,
+    runChain,
   });
 
   const ctx: AgentContext = {
@@ -120,14 +124,19 @@ interface McpResolveOpts {
   memoryEnabled: boolean;
   memoryPath: string;
   memoryCharLimit: number;
+  peerAgents: readonly string[];
+  runChain: readonly string[];
 }
 
 function resolveMcpServers(opts: McpResolveOpts): McpServerSpec[] {
   const servers: McpServerSpec[] = [];
 
   // Auto-inject the `delego` server (per-run, bound to this agent's context).
-  // The server hosts the `memory` tool today; delegate_<peer> arrives in M5.
+  // Hosts the `memory` tool plus one `delegate_<peer>` per eligible peer agent (M5).
   const inv = selfInvocationArgs(["mcp", "serve"]);
+  // Compute the *base* invocation (no subcommand) for sub-runs delegated via MCP.
+  const baseInv = selfInvocationArgs([]);
+
   servers.push({
     name: "delego",
     type: "stdio",
@@ -138,6 +147,13 @@ function resolveMcpServers(opts: McpResolveOpts): McpServerSpec[] {
       DELEGO_MCP_MEMORY_PATH: opts.memoryPath,
       DELEGO_MCP_CHAR_LIMIT: String(opts.memoryCharLimit),
       DELEGO_MCP_MEMORY_ENABLED: opts.memoryEnabled ? "1" : "0",
+      DELEGO_MCP_PEERS: opts.peerAgents.join(","),
+      DELEGO_MCP_RUN_CHAIN: opts.runChain.join(","),
+      DELEGO_MCP_CLI_COMMAND: baseInv.command,
+      DELEGO_MCP_CLI_LEAD_ARGS: JSON.stringify(baseInv.args),
+      ...(process.env.DELEGO_MAX_SPAWN_DEPTH
+        ? { DELEGO_MAX_SPAWN_DEPTH: process.env.DELEGO_MAX_SPAWN_DEPTH }
+        : {}),
     },
   });
 
@@ -145,4 +161,21 @@ function resolveMcpServers(opts: McpResolveOpts): McpServerSpec[] {
   // and append them here.
 
   return servers;
+}
+
+/**
+ * Read the inherited DELEGO_RUN_CHAIN (set by a parent delego process when this
+ * agent is being invoked via a `delegate_<peer>` MCP tool). The current agent
+ * name is always appended if missing, so the chain accurately reflects the
+ * complete ancestry of this run.
+ */
+function currentRunChain(agentName: string): string[] {
+  const raw = process.env.DELEGO_RUN_CHAIN ?? "";
+  const parts = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (parts.length === 0) return [agentName];
+  if (parts[parts.length - 1] !== agentName) parts.push(agentName);
+  return parts;
 }

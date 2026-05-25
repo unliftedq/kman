@@ -57,14 +57,21 @@ export const mcpCommand = defineCommand({
             console.error(`Agent "${manualAgent}" not found at ${loc.dir}`);
             process.exit(2);
           }
-          // Minimal manual mode: load profile to get char_limit, expose memory if enabled.
-          const { loadAgent } = await import("@delego/core");
+          // Minimal manual mode: load profile and resolve peers so delegate_<peer>
+          // tools are exposed alongside memory.
+          const { loadAgent, listAgentNames, selfInvocationArgs } = await import("@delego/core");
           const profile = await loadAgent(manualAgent);
+          const allAgents = await listAgentNames();
+          const peers = allAgents.filter((n) => n !== manualAgent);
+          const baseInv = selfInvocationArgs([]);
           await runStdio({
             agentName: manualAgent,
             memoryPath: join(loc.dir, "memories", "MEMORY.md"),
             memoryCharLimit: profile.memory.char_limit,
             memoryEnabled: profile.memory.enabled,
+            peers,
+            cliCommand: baseInv.command,
+            cliLeadArgs: baseInv.args,
           });
           return;
         }
