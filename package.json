@@ -1,0 +1,29 @@
+{
+  "name": "delego",
+  "private": true,
+  "version": "0.0.0",
+  "description": "A multi-agent orchestration engine. CLI today, desktop/web/gateway tomorrow.",
+  "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "delego": "bun --bun apps/cli/src/main.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "packageManager": "bun@1.1.0"
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@delego/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "delego": "./src/main.ts"
+  },
+  "main": "./src/main.ts",
+  "scripts": {
+    "dev": "bun --watch run src/main.ts",
+    "build": "bun build src/main.ts --target=node --outdir=dist",
+    "build:binary": "bun build src/main.ts --compile --outfile=dist/delego",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@delego/core": "workspace:*",
+    "@delego/types": "workspace:*",
+    "@delego/backend-claude-code": "workspace:*",
+    "@delego/mcp-server": "workspace:*",
+    "@delego/skills": "workspace:*",
+    "citty": "^0.1.6",
+    "consola": "^3.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
