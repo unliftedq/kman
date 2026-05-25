@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { MemoryStore } from "@delego/core";
 
 import { registerMemoryTool, ToolRegistry } from "./tools/memory";
+import { registerDelegateTools } from "./tools/delegate";
 
 export interface DelegoServerOptions {
   /** Agent identity this server instance is bound to. */
@@ -13,7 +14,21 @@ export interface DelegoServerOptions {
   memoryCharLimit: number;
   /** Whether memory tool should be exposed (off when agent has memory disabled). */
   memoryEnabled: boolean;
+
+  // ----- Multi-agent (M5) -----
+  /** Peer agents available for `delegate_<peer>` tools. */
+  peers?: readonly string[];
+  /** Current run-chain (oldest → newest), including the calling agent at the tail. */
+  runChain?: readonly string[];
+  /** Max chain length. Defaults to 3. */
+  maxSpawnDepth?: number;
+  /** Executable used to re-invoke the delego CLI for sub-runs. */
+  cliCommand?: string;
+  /** Leading argv before the subcommand (script path in dev; empty in compiled binary). */
+  cliLeadArgs?: readonly string[];
 }
+
+export const DEFAULT_MAX_SPAWN_DEPTH = 3;
 
 /** Construct a per-agent-context delego MCP server (no transport attached yet). */
 export function createDelegoServer(opts: DelegoServerOptions): Server {
@@ -32,13 +47,25 @@ export function createDelegoServer(opts: DelegoServerOptions): Server {
   if (opts.memoryEnabled) {
     const store = new MemoryStore({ path: opts.memoryPath, charLimit: opts.memoryCharLimit });
     registerMemoryTool(server, { store }, registry);
-  } else {
-    // Even with memory disabled, install handlers so list_tools returns an empty array
-    // (otherwise clients see a "Method not found" error on list_tools).
-    registry.ensureHandlersInstalled(server);
   }
 
-  // TODO(M5): registerDelegateTools(server, registry, opts.peerAgents);
+  // delegate_<peer> tools (M5). Only register when we know how to re-invoke
+  // the CLI; otherwise silently skip — the memory tool path still works.
+  const peers = opts.peers ?? [];
+  if (peers.length > 0 && opts.cliCommand) {
+    registerDelegateTools(server, registry, {
+      agentName: opts.agentName,
+      peers,
+      runChain: opts.runChain ?? [opts.agentName],
+      maxDepth: opts.maxSpawnDepth ?? DEFAULT_MAX_SPAWN_DEPTH,
+      cliCommand: opts.cliCommand,
+      cliLeadArgs: opts.cliLeadArgs ?? [],
+    });
+  }
+
+  // Always ensure list_tools / call_tools handlers respond even when no tools
+  // are registered (otherwise clients see "Method not found").
+  registry.ensureHandlersInstalled(server);
 
   return server;
 }
@@ -60,7 +87,29 @@ export async function runFromEnv(): Promise<void> {
   const memoryPath = required("DELEGO_MCP_MEMORY_PATH");
   const memoryCharLimit = Number.parseInt(process.env.DELEGO_MCP_CHAR_LIMIT ?? "2200", 10);
   const memoryEnabled = (process.env.DELEGO_MCP_MEMORY_ENABLED ?? "1") !== "0";
-  await runStdio({ agentName, memoryPath, memoryCharLimit, memoryEnabled });
+
+  const peers = splitCsv(process.env.DELEGO_MCP_PEERS);
+  const runChain = splitCsv(process.env.DELEGO_MCP_RUN_CHAIN);
+  const maxSpawnDepth = Number.parseInt(
+    process.env.DELEGO_MAX_SPAWN_DEPTH ?? String(DEFAULT_MAX_SPAWN_DEPTH),
+    10,
+  );
+  const cliCommand = process.env.DELEGO_MCP_CLI_COMMAND;
+  const cliLeadArgs = parseJsonArray(process.env.DELEGO_MCP_CLI_LEAD_ARGS);
+
+  const opts: DelegoServerOptions = {
+    agentName,
+    memoryPath,
+    memoryCharLimit,
+    memoryEnabled,
+    peers,
+    runChain: runChain.length > 0 ? runChain : [agentName],
+    maxSpawnDepth: Number.isFinite(maxSpawnDepth) ? maxSpawnDepth : DEFAULT_MAX_SPAWN_DEPTH,
+    ...(cliCommand ? { cliCommand } : {}),
+    cliLeadArgs,
+  };
+
+  await runStdio(opts);
 }
 
 function required(name: string): string {
@@ -71,4 +120,25 @@ function required(name: string): string {
     );
   }
   return v;
+}
+
+function splitCsv(v: string | undefined): string[] {
+  if (!v) return [];
+  return v
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function parseJsonArray(v: string | undefined): string[] {
+  if (!v) return [];
+  try {
+    const parsed = JSON.parse(v) as unknown;
+    if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) {
+      return parsed as string[];
+    }
+  } catch {
+    // fall through
+  }
+  return [];
 }
