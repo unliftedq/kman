@@ -21,7 +21,6 @@ export interface AgentContext {
   readonly memoryPath: string;
   readonly sessionsDir: string;
   readonly hooksDir: string;
-  readonly skillsDir: string;
 
   /** Effective runtime selection (after CLI overrides) */
   readonly runtime: BackendName;
@@ -34,7 +33,6 @@ export interface AgentContext {
   /** Effective behavioral config */
   readonly memory: MemoryConfig & { snapshot: string };
   readonly tools: ToolsConfig;
-  readonly enabledSkills: string[];
   readonly hooks: HooksConfig;
 
   /** Rendered system prompt = soul.md + frozen memory snapshot block */

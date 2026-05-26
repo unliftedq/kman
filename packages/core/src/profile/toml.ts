@@ -58,13 +58,6 @@ export function parseProfile(toml: string, fallbackName: string): Profile {
     provider: typeof memoryRaw.provider === "string" ? memoryRaw.provider : "",
   };
 
-  const skillsRaw = (raw.skills ?? {}) as Record<string, unknown>;
-  const skills = {
-    enabled: Array.isArray(skillsRaw.enabled)
-      ? (skillsRaw.enabled as unknown[]).filter((s): s is string => typeof s === "string")
-      : [],
-  };
-
   const toolsRaw = (raw.tools ?? {}) as Record<string, unknown>;
   const tools: ToolsConfig = {};
   for (const [k, v] of Object.entries(toolsRaw)) {
@@ -115,7 +108,6 @@ export function parseProfile(toml: string, fallbackName: string): Profile {
     runtime,
     soul,
     memory,
-    skills,
     tools,
     hooks,
     defaults,
@@ -162,10 +154,6 @@ export function stringifyProfile(p: Profile): string {
   lines.push(`enabled    = ${p.memory.enabled}`);
   lines.push(`char_limit = ${p.memory.char_limit}`);
   lines.push(`provider   = ${JSON.stringify(p.memory.provider)}`);
-  lines.push("");
-
-  lines.push("[skills]");
-  lines.push(`enabled = ${JSON.stringify(p.skills.enabled)}`);
   lines.push("");
 
   if (Object.keys(p.tools).length > 0) {

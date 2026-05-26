@@ -94,6 +94,9 @@ export const claudeCodeBackend: Backend = {
     // greedily consume our positional task argument. ctx.cwd is honored via
     // child_process's `cwd` option below, which is what claude treats as its workspace.
 
+    // Per-agent plugin: agent directory is organized as a Claude Code plugin
+    args.push("--plugin-dir", ctx.agentDir);
+
     // Raw escape hatch flags from --runtime-flag, plus profile [runtime.claude-code].extra_args
     const override = ctx.profile.runtimeOverrides["claude-code"];
     if (override?.permission_mode_raw) {
@@ -192,9 +195,75 @@ export const claudeCodeBackend: Backend = {
     }
   },
 
-  async chat(_ctx: AgentContext, _opts: ChatOptions): Promise<ChatHandle> {
-    // M2: not yet implemented — chat REPL deferred until basic run loop is stable.
-    throw new Error("claude-code backend chat: not implemented yet");
+  async chat(ctx: AgentContext, opts: ChatOptions): Promise<ChatHandle> {
+    const promptPath = await writePromptFile(ctx);
+    const mcpConfigPath = await writeMcpConfig(ctx);
+
+    const args: string[] = [
+      "--append-system-prompt-file",
+      promptPath,
+      "--permission-mode",
+      mapPermission(ctx.permission),
+    ];
+
+    if (mcpConfigPath) {
+      args.push("--mcp-config", mcpConfigPath, "--strict-mcp-config");
+    }
+
+    if (ctx.model) args.push("--model", ctx.model);
+    if (opts.resume) args.push("--resume", opts.resume);
+
+    // Per-agent plugin: agent directory is organized as a Claude Code plugin
+    args.push("--plugin-dir", ctx.agentDir);
+
+    const override = ctx.profile.runtimeOverrides["claude-code"];
+    if (override?.permission_mode_raw) {
+      const idx = args.indexOf("--permission-mode");
+      if (idx >= 0) args[idx + 1] = override.permission_mode_raw;
+    }
+    if (override?.extra_args) args.push(...override.extra_args);
+    for (const [k, v] of Object.entries(ctx.runtimeRawFlags)) {
+      args.push(`--${k}`, v);
+    }
+
+    const cleanup = async () => {
+      await unlink(promptPath).catch(() => {});
+      if (mcpConfigPath) await unlink(mcpConfigPath).catch(() => {});
+    };
+
+    let proc: ChildProcess;
+    try {
+      proc = spawn("claude", args, {
+        cwd: ctx.cwd,
+        stdio: "inherit",
+        env: { ...process.env },
+      });
+    } catch (err) {
+      await cleanup();
+      throw new Error(`Failed to spawn claude: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      proc.once("spawn", resolve);
+      proc.once("error", reject);
+    }).catch(async (err: Error) => {
+      await cleanup();
+      throw new Error(`Failed to spawn claude: ${err.message}`);
+    });
+
+    return {
+      done: async () => {
+        const code = await new Promise<number>((resolve) => {
+          if (proc.exitCode !== null) return resolve(proc.exitCode);
+          proc.once("exit", (c) => resolve(c ?? 0));
+        });
+        await cleanup();
+        return code;
+      },
+      kill: (signal) => {
+        proc.kill(signal);
+      },
+    };
   },
 };
 

@@ -9,7 +9,6 @@ import {
   removeSkill,
   updateSkill,
 } from "@delego/skills";
-import { loadAgent, updateAgent } from "@delego/core";
 import { b, s } from "../arg-helpers";
 
 export const skillCommand = defineCommand({
@@ -30,7 +29,6 @@ export const skillCommand = defineCommand({
             name: s(args.name) || undefined,
             force: b(args.force),
           });
-          await enableSkillInProfile(agent, installed.name);
           console.log(`Installed "${installed.name}" -> ${installed.dir}`);
           if (installed.description) console.log(`  description: ${installed.description}`);
         } catch (err) {
@@ -52,7 +50,6 @@ export const skillCommand = defineCommand({
         const agent = s(args.agent);
         const skill = s(args.skill);
         await removeSkill(agent, skill);
-        await disableSkillInProfile(agent, skill);
         console.log(`Removed "${skill}" from "${agent}"`);
       },
     }),
@@ -152,24 +149,8 @@ export const skillCommand = defineCommand({
       run: async ({ args }) => {
         const agent = s(args.agent);
         const forked = await forkSkill(agent, s(args.skill), s(args["new-name"]));
-        await enableSkillInProfile(agent, forked.name);
         console.log(`Forked "${s(args.skill)}" -> "${forked.name}" at ${forked.dir}`);
       },
     }),
   },
 });
-
-async function enableSkillInProfile(agent: string, skill: string): Promise<void> {
-  await updateAgent(agent, (p) => {
-    if (!p.skills.enabled.includes(skill)) p.skills.enabled.push(skill);
-  });
-}
-
-async function disableSkillInProfile(agent: string, skill: string): Promise<void> {
-  await updateAgent(agent, (p) => {
-    p.skills.enabled = p.skills.enabled.filter((s) => s !== skill);
-  });
-}
-
-// Touch `loadAgent` import linter — used indirectly via updateAgent; kept for future per-agent skill reads.
-void loadAgent;

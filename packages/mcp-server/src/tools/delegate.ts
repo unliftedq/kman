@@ -25,11 +25,16 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
 import type { ToolRegistry } from "./memory";
 
+export interface PeerInfo {
+  name: string;
+  description?: string;
+}
+
 export interface DelegateContext {
   /** The agent this MCP server is bound to. */
   agentName: string;
   /** All known peers (full registry, before chain/self filtering). */
-  peers: readonly string[];
+  peers: readonly PeerInfo[];
   /** Current run chain, oldest first. The calling agent is at the tail. */
   runChain: readonly string[];
   /** Max chain length. Default 3. */
@@ -96,27 +101,26 @@ export function registerDelegateTools(
   }
 
   const chainSet = new Set(ctx.runChain);
-  // Defensive: `runChain` is documented to include the calling agent at the
-  // tail, but external callers of `createDelegoServer` may pass shorter chains.
-  // Explicitly excluding `agentName` keeps self-loop protection independent of
-  // that contract.
   chainSet.add(ctx.agentName);
 
   const eligible: string[] = [];
   for (const peer of ctx.peers) {
-    if (chainSet.has(peer)) continue;
-    eligible.push(peer);
+    if (chainSet.has(peer.name)) continue;
+    eligible.push(peer.name);
 
+    const agentDesc = peer.description
+      ? `${peer.description} `
+      : `Peer agent "${peer.name}". `;
     const tool: Tool = {
-      name: toolNameFor(peer),
+      name: toolNameFor(peer.name),
       description:
-        `Delegate a task to peer agent "${peer}". ` +
-        `Runs a one-shot \`delego run ${peer}\` as a sub-process and returns its final output. ` +
-        `Use sparingly — each call spawns a new agent run with its own memory and session.`,
+        agentDesc +
+        `Delegate a task via \`delego run ${peer.name}\`. ` +
+        `Each call spawns a new agent run with its own memory and session.`,
       inputSchema: DELEGATE_INPUT_SCHEMA,
     };
 
-    registry.add(tool, async (args) => invokeDelegate(ctx, peer, args as DelegateArgs));
+    registry.add(tool, async (args) => invokeDelegate(ctx, peer.name, args as DelegateArgs));
   }
 
   registry.ensureHandlersInstalled(server);

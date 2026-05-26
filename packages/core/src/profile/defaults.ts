@@ -17,7 +17,6 @@ export function defaultProfile(name: string, runtime: BackendName = "claude-code
       char_limit: DEFAULT_MEMORY_CHAR_LIMIT,
       provider: "",
     },
-    skills: { enabled: [] },
     tools: {},
     hooks: {},
     defaults: {

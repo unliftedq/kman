@@ -21,10 +21,6 @@ export interface MemoryConfig {
   provider: string;
 }
 
-export interface SkillsConfig {
-  enabled: string[];
-}
-
 export type ToolEntry =
   | { type: "mcp"; server: string; include?: string[] }
   | { type: "shell"; cmd: string }
@@ -62,7 +58,6 @@ export interface Profile {
   runtime: RuntimeConfig;
   soul: SoulConfig;
   memory: MemoryConfig;
-  skills: SkillsConfig;
   tools: ToolsConfig;
   hooks: HooksConfig;
   defaults: DefaultsConfig;

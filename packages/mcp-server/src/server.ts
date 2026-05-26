@@ -1,10 +1,9 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { MemoryStore } from "@delego/core";
+import { MemoryStore, loadAgent } from "@delego/core";
 
 import { registerMemoryTool, ToolRegistry } from "./tools/memory";
-import { registerDelegateTools } from "./tools/delegate";
-import { registerSkillsTool } from "./tools/skills";
+import { registerDelegateTools, type PeerInfo } from "./tools/delegate";
 
 export interface DelegoServerOptions {
   /** Agent identity this server instance is bound to. */
@@ -16,15 +15,9 @@ export interface DelegoServerOptions {
   /** Whether memory tool should be exposed (off when agent has memory disabled). */
   memoryEnabled: boolean;
 
-  // ----- Skills -----
-  /** Absolute path to the agent's skills directory. */
-  skillsDir?: string;
-  /** Names of skills enabled for this agent. */
-  enabledSkills?: readonly string[];
-
   // ----- Multi-agent (M5) -----
   /** Peer agents available for `delegate_<peer>` tools. */
-  peers?: readonly string[];
+  peers?: readonly PeerInfo[];
   /** Current run-chain (oldest → newest), including the calling agent at the tail. */
   runChain?: readonly string[];
   /** Max chain length. Defaults to 3. */
@@ -54,11 +47,6 @@ export function createDelegoServer(opts: DelegoServerOptions): Server {
   if (opts.memoryEnabled) {
     const store = new MemoryStore({ path: opts.memoryPath, charLimit: opts.memoryCharLimit });
     registerMemoryTool(server, { store }, registry);
-  }
-
-  const enabledSkills = opts.enabledSkills ?? [];
-  if (opts.skillsDir && enabledSkills.length > 0) {
-    registerSkillsTool(server, { skillsDir: opts.skillsDir, enabledSkills }, registry);
   }
 
   // delegate_<peer> tools (M5). Only register when we know how to re-invoke
@@ -101,6 +89,16 @@ export async function runFromEnv(): Promise<void> {
   const memoryEnabled = (process.env.DELEGO_MCP_MEMORY_ENABLED ?? "1") !== "0";
 
   const peers = splitCsv(process.env.DELEGO_MCP_PEERS);
+  const peerInfos: PeerInfo[] = await Promise.all(
+    peers.map(async (name) => {
+      try {
+        const profile = await loadAgent(name);
+        return { name, description: profile.description };
+      } catch {
+        return { name };
+      }
+    }),
+  );
   const runChain = splitCsv(process.env.DELEGO_MCP_RUN_CHAIN);
   const maxSpawnDepth = Number.parseInt(
     process.env.DELEGO_MAX_SPAWN_DEPTH ?? String(DEFAULT_MAX_SPAWN_DEPTH),
@@ -109,16 +107,12 @@ export async function runFromEnv(): Promise<void> {
   const cliCommand = process.env.DELEGO_MCP_CLI_COMMAND;
   const cliLeadArgs = parseJsonArray(process.env.DELEGO_MCP_CLI_LEAD_ARGS);
 
-  const skillsDir = process.env.DELEGO_MCP_SKILLS_DIR;
-  const enabledSkills = splitCsv(process.env.DELEGO_MCP_SKILLS);
-
   const opts: DelegoServerOptions = {
     agentName,
     memoryPath,
     memoryCharLimit,
     memoryEnabled,
-    ...(skillsDir ? { skillsDir, enabledSkills } : {}),
-    peers,
+    peers: peerInfos,
     runChain: runChain.length > 0 ? runChain : [agentName],
     maxSpawnDepth: Number.isFinite(maxSpawnDepth) ? maxSpawnDepth : DEFAULT_MAX_SPAWN_DEPTH,
     ...(cliCommand ? { cliCommand } : {}),
