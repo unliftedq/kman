@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import { buildAgentContext } from "@delego/core";
 import type { PermissionMode } from "@delego/types";
 import { getBackend } from "../backends";
-import { b, s, sOpt, ss } from "../arg-helpers";
+import { b, parseRuntimeFlag, s, sOpt, ss } from "../arg-helpers";
 
 export const chatCommand = defineCommand({
   meta: { name: "chat", description: "Start an interactive REPL with an agent" },
@@ -45,13 +45,3 @@ export const chatCommand = defineCommand({
     process.exit(exitCode);
   },
 });
-
-function parseRuntimeFlag(items: string[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const item of items) {
-    const eq = item.indexOf("=");
-    if (eq <= 0) continue;
-    out[item.slice(0, eq)] = item.slice(eq + 1);
-  }
-  return out;
-}

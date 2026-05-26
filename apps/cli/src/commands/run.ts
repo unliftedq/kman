@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import { buildAgentContext, runAgent } from "@delego/core";
 import type { OutputFormat, PermissionMode } from "@delego/types";
 import { getBackend } from "../backends";
-import { b, s, sOpt, ss } from "../arg-helpers";
+import { b, parseRuntimeFlag, s, sOpt, ss } from "../arg-helpers";
 
 export const runCommand = defineCommand({
   meta: { name: "run", description: "Run an agent against a task (one-shot)" },
@@ -57,13 +57,3 @@ export const runCommand = defineCommand({
     }
   },
 });
-
-function parseRuntimeFlag(items: string[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const item of items) {
-    const eq = item.indexOf("=");
-    if (eq <= 0) continue;
-    out[item.slice(0, eq)] = item.slice(eq + 1);
-  }
-  return out;
-}

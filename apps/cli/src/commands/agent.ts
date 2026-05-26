@@ -9,16 +9,12 @@ import {
   stringifyProfile,
 } from "@delego/core";
 import { spawnSync } from "node:child_process";
-import { memoryCommand } from "./agent-memory";
-import { skillCommand } from "./agent-skill";
-import { toolCommand } from "./agent-tool";
-import { hookCommand } from "./agent-hook";
 import { b, s, sOpt } from "../arg-helpers";
 
 export const agentCommand = defineCommand({
   meta: {
     name: "agent",
-    description: "Manage agent profiles (create, list, show, delete, edit)",
+    description: "Manage agent profiles (create, list, show, delete, rename, edit, soul)",
   },
   subCommands: {
     create: defineCommand({
@@ -130,10 +126,6 @@ export const agentCommand = defineCommand({
         }),
       },
     }),
-    memory: memoryCommand,
-    skill: skillCommand,
-    tool: toolCommand,
-    hook: hookCommand,
   },
 });
 

@@ -21,3 +21,13 @@ export function ss(v: unknown): string[] {
   if (typeof v === "string") return [v];
   return [];
 }
+
+export function parseRuntimeFlag(items: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const item of items) {
+    const eq = item.indexOf("=");
+    if (eq <= 0) continue;
+    out[item.slice(0, eq)] = item.slice(eq + 1);
+  }
+  return out;
+}
