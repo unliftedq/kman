@@ -1,3 +1,4 @@
+import { spawn, type ChildProcess } from "node:child_process";
 import type {
   AgentContext,
   Backend,
@@ -73,8 +74,74 @@ export const copilotCliBackend: Backend = {
     });
   },
 
-  async chat(_ctx: AgentContext, _opts: ChatOptions): Promise<ChatHandle> {
-    throw new Error("copilot-cli backend chat: not implemented yet");
+  async chat(ctx: AgentContext, opts: ChatOptions): Promise<ChatHandle> {
+    const args: string[] = [];
+
+    // Permission mapping (mirrors spawn(): yolo → --allow-all-tools)
+    if (mapPermission(ctx.permission) === "yolo") {
+      args.push("--allow-all-tools");
+    }
+
+    if (ctx.model) args.push("--model", ctx.model);
+
+    // Profile [runtime.copilot-cli] escape hatches
+    const override = ctx.profile.runtimeOverrides["copilot-cli"];
+    if (override?.extra_args) args.push(...override.extra_args);
+
+    // --runtime-flag k=v passthrough
+    for (const [k, v] of Object.entries(ctx.runtimeRawFlags)) {
+      args.push(`--${k}`, v);
+    }
+
+    if (opts.resume) {
+      // copilot-cli does not currently expose a native resume flag; transcript
+      // replay is the documented strategy. Surface a heads-up rather than
+      // silently dropping the user's intent.
+      process.stderr.write(
+        `[copilot-cli] --resume requested but not natively supported; ignoring.\n`,
+      );
+    }
+
+    // copilot-cli has no equivalent of claude's --append-system-prompt-file,
+    // so soul.md + memory cannot be injected into the interactive REPL. Make
+    // this explicit so users aren't surprised that the agent appears generic.
+    if (ctx.systemPrompt.trim().length > 0) {
+      process.stderr.write(
+        `[copilot-cli] interactive chat does not support system-prompt injection; ` +
+          `soul.md and memory will not be visible to the model.\n`,
+      );
+    }
+
+    let proc: ChildProcess;
+    try {
+      proc = spawn("copilot", args, {
+        cwd: ctx.cwd,
+        stdio: "inherit",
+        env: { ...process.env },
+      });
+    } catch (err) {
+      throw new Error(
+        `Failed to spawn copilot: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      proc.once("spawn", resolve);
+      proc.once("error", reject);
+    }).catch((err: Error) => {
+      throw new Error(`Failed to spawn copilot: ${err.message}`);
+    });
+
+    return {
+      done: async () =>
+        new Promise<number>((resolve) => {
+          if (proc.exitCode !== null) return resolve(proc.exitCode);
+          proc.once("exit", (code) => resolve(code ?? 0));
+        }),
+      kill: (signal) => {
+        proc.kill(signal);
+      },
+    };
   },
 };
 

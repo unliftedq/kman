@@ -52,6 +52,10 @@ export const runCommand = defineCommand({
 
     const summary = await runAgent(ctx, backend, runOpts);
 
+    if (summary.exitReason === "aborted") {
+      // Per DESIGN.md §6.7: exit 3 for "hook aborted run (pre_run non-zero)".
+      process.exit(3);
+    }
     if (summary.exitReason === "error") {
       process.exit(1);
     }

@@ -7,6 +7,7 @@ import type {
 } from "@delego/types";
 
 import { openSessionWriter, type SessionWriter } from "../sessions";
+import { runHooks, type HookBatchResult } from "../hooks";
 
 export * from "./self-invoke";
 
@@ -19,6 +20,27 @@ export interface RunSummary {
   outputTokens: number;
   costUsd?: number;
   errorMessage?: string;
+}
+
+function hookEnv(ctx: AgentContext, extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    DELEGO_AGENT_NAME: ctx.agentName,
+    DELEGO_RUN_ID: ctx.runId,
+    DELEGO_SESSION_ID: ctx.sessionId,
+    DELEGO_AGENT_DIR: ctx.agentDir,
+    DELEGO_RUNTIME: ctx.runtime,
+    DELEGO_CWD: ctx.cwd,
+    ...extra,
+  };
+}
+
+function describeHookFailure(batch: HookBatchResult): string {
+  const f = batch.abortedBy;
+  if (!f) return "hook aborted run";
+  const which = f.entry.command ? `command: ${f.entry.command}` : `script: ${f.entry.script}`;
+  if (f.spawnError) return `pre_run hook failed to spawn (${which}): ${f.spawnError}`;
+  if (f.timedOut) return `pre_run hook timed out (${which})`;
+  return `pre_run hook exited with code ${f.exitCode} (${which})`;
 }
 
 export interface RunAgentOptions extends RunOptions {
@@ -47,6 +69,46 @@ export async function runAgent(
   let costUsd: number | undefined;
   let exitReason: RunSummary["exitReason"] = "completed";
   let errorMessage: string | undefined;
+
+  // pre_run hooks: gate the run. Non-zero exit aborts before backend spawn.
+  const preRunBatch = await runHooks(ctx.hooks.pre_run, {
+    event: "pre_run",
+    payload: {
+      agent: ctx.agentName,
+      run_id: ctx.runId,
+      session_id: ctx.sessionId,
+      task: opts.task,
+      runtime: ctx.runtime,
+      ...(ctx.model ? { model: ctx.model } : {}),
+      permission: ctx.permission,
+      cwd: ctx.cwd,
+      ...(opts.resume ? { resume: opts.resume } : {}),
+    },
+    cwd: ctx.cwd,
+    hooksDir: ctx.hooksDir,
+    env: hookEnv(ctx),
+  });
+  if (preRunBatch.aborted) {
+    exitReason = "aborted";
+    errorMessage = describeHookFailure(preRunBatch);
+    const errEvent: DelegoEvent = { type: "error", message: errorMessage, recoverable: false };
+    await writer.write(errEvent);
+    if (opts.output === "stream-json") {
+      out.write(JSON.stringify(errEvent) + "\n");
+    } else if (opts.output === "text") {
+      process.stderr.write(`\n[error] ${errorMessage}\n`);
+    }
+    await writer.close();
+    return {
+      sessionId: ctx.sessionId,
+      sessionPath: writer.path,
+      exitReason,
+      turns,
+      inputTokens,
+      outputTokens,
+      errorMessage,
+    };
+  }
 
   try {
     for await (const event of backend.spawn(ctx, opts)) {
@@ -95,6 +157,45 @@ export async function runAgent(
     }
   } finally {
     await writer.close();
+  }
+
+  // post_run / on_error hooks fire after the backend stream is fully drained.
+  // Failures here are recorded to stderr but never change the run's exit status.
+  const success = exitReason === "completed";
+  const postEnv = hookEnv(ctx, {
+    DELEGO_EXIT_REASON: exitReason,
+    DELEGO_SUCCESS: success ? "1" : "0",
+  });
+  const postPayload = {
+    agent: ctx.agentName,
+    run_id: ctx.runId,
+    session_id: ctx.sessionId,
+    session_path: writer.path,
+    exit_reason: exitReason,
+    success,
+    turns,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    ...(typeof costUsd === "number" ? { cost_usd: costUsd } : {}),
+    ...(errorMessage ? { error: errorMessage } : {}),
+  };
+  await runHooks(ctx.hooks.post_run, {
+    event: "post_run",
+    payload: postPayload,
+    cwd: ctx.cwd,
+    hooksDir: ctx.hooksDir,
+    env: postEnv,
+    success,
+  });
+  if (!success) {
+    await runHooks(ctx.hooks.on_error, {
+      event: "on_error",
+      payload: postPayload,
+      cwd: ctx.cwd,
+      hooksDir: ctx.hooksDir,
+      env: postEnv,
+      success: false,
+    });
   }
 
   if (opts.output === "text") {
