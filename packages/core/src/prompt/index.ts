@@ -64,7 +64,7 @@ export async function renderSkillCatalog(skillsDir: string, enabled: readonly st
     } else {
       lines.push(`- ${name}`);
     }
-    lines.push(`    Read ${skillMd} for full instructions.`);
+    lines.push(`    Use skill_view("${name}") to load full instructions.`);
   }
   return lines.join("\n");
 }

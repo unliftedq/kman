@@ -81,6 +81,8 @@ export async function buildAgentContext(
     memoryEnabled,
     memoryPath: loc.memoryPath,
     memoryCharLimit: profile.memory.char_limit,
+    skillsDir: loc.skillsDir,
+    enabledSkills: profile.skills.enabled,
     peerAgents,
     runChain,
   });
@@ -124,6 +126,8 @@ interface McpResolveOpts {
   memoryEnabled: boolean;
   memoryPath: string;
   memoryCharLimit: number;
+  skillsDir: string;
+  enabledSkills: readonly string[];
   peerAgents: readonly string[];
   runChain: readonly string[];
 }
@@ -149,6 +153,8 @@ function resolveMcpServers(opts: McpResolveOpts): McpServerSpec[] {
       DELEGO_MCP_MEMORY_ENABLED: opts.memoryEnabled ? "1" : "0",
       DELEGO_MCP_PEERS: opts.peerAgents.join(","),
       DELEGO_MCP_RUN_CHAIN: opts.runChain.join(","),
+      DELEGO_MCP_SKILLS_DIR: opts.skillsDir,
+      DELEGO_MCP_SKILLS: opts.enabledSkills.join(","),
       DELEGO_MCP_CLI_COMMAND: baseInv.command,
       DELEGO_MCP_CLI_LEAD_ARGS: JSON.stringify(baseInv.args),
       ...(process.env.DELEGO_MAX_SPAWN_DEPTH

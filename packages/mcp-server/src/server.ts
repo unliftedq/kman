@@ -4,6 +4,7 @@ import { MemoryStore } from "@delego/core";
 
 import { registerMemoryTool, ToolRegistry } from "./tools/memory";
 import { registerDelegateTools } from "./tools/delegate";
+import { registerSkillsTool } from "./tools/skills";
 
 export interface DelegoServerOptions {
   /** Agent identity this server instance is bound to. */
@@ -14,6 +15,12 @@ export interface DelegoServerOptions {
   memoryCharLimit: number;
   /** Whether memory tool should be exposed (off when agent has memory disabled). */
   memoryEnabled: boolean;
+
+  // ----- Skills -----
+  /** Absolute path to the agent's skills directory. */
+  skillsDir?: string;
+  /** Names of skills enabled for this agent. */
+  enabledSkills?: readonly string[];
 
   // ----- Multi-agent (M5) -----
   /** Peer agents available for `delegate_<peer>` tools. */
@@ -47,6 +54,11 @@ export function createDelegoServer(opts: DelegoServerOptions): Server {
   if (opts.memoryEnabled) {
     const store = new MemoryStore({ path: opts.memoryPath, charLimit: opts.memoryCharLimit });
     registerMemoryTool(server, { store }, registry);
+  }
+
+  const enabledSkills = opts.enabledSkills ?? [];
+  if (opts.skillsDir && enabledSkills.length > 0) {
+    registerSkillsTool(server, { skillsDir: opts.skillsDir, enabledSkills }, registry);
   }
 
   // delegate_<peer> tools (M5). Only register when we know how to re-invoke
@@ -97,11 +109,15 @@ export async function runFromEnv(): Promise<void> {
   const cliCommand = process.env.DELEGO_MCP_CLI_COMMAND;
   const cliLeadArgs = parseJsonArray(process.env.DELEGO_MCP_CLI_LEAD_ARGS);
 
+  const skillsDir = process.env.DELEGO_MCP_SKILLS_DIR;
+  const enabledSkills = splitCsv(process.env.DELEGO_MCP_SKILLS);
+
   const opts: DelegoServerOptions = {
     agentName,
     memoryPath,
     memoryCharLimit,
     memoryEnabled,
+    ...(skillsDir ? { skillsDir, enabledSkills } : {}),
     peers,
     runChain: runChain.length > 0 ? runChain : [agentName],
     maxSpawnDepth: Number.isFinite(maxSpawnDepth) ? maxSpawnDepth : DEFAULT_MAX_SPAWN_DEPTH,
