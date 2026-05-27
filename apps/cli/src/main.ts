@@ -1,5 +1,6 @@
 import { Command, CommanderError } from 'commander';
 import { KmanError, ExitCode } from '@kman/types';
+import pkg from '../package.json' with { type: 'json' };
 import { buildAgentCommand } from './commands/agent.js';
 import { buildSkillsCommand } from './commands/skills.js';
 import { buildRunCommand } from './commands/run.js';
@@ -30,7 +31,7 @@ const program = new Command();
 program
   .name('kman')
   .description('Multi-agent orchestration engine (inspired by Kingsman).')
-  .version('0.0.0', '-v, --version', 'Print kman CLI version.')
+  .version(pkg.version, '-v, --version', 'Print kman CLI version.')
   .helpOption('-h, --help', 'Show help.')
   .showHelpAfterError()
   .exitOverride();

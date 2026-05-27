@@ -25,4 +25,4 @@ See the monorepo at https://github.com/unliftedq/kman for the design document an
 
 ## License
 
-MIT
+Apache-2.0

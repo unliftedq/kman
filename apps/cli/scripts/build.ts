@@ -24,7 +24,7 @@ await mkdir(outDir, { recursive: true });
 
 await run(
   'bun',
-  ['build', './src/main.ts', '--target=node', `--outdir=${outDir}`, '--minify', '--sourcemap=linked'],
+  ['build', './src/main.ts', '--target=node', `--outdir=${outDir}`, '--minify'],
   cliRoot,
 );
 

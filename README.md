@@ -36,3 +36,7 @@ bun run kman agent list
 ```
 
 Once published and installed globally (`bun install -g @unliftedq/kman`), the binary is just `kman`.
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE).

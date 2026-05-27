@@ -1,6 +1,6 @@
 {
   "name": "@unliftedq/kman",
-  "version": "0.0.0",
+  "version": "0.0.2",
   "description": "Multi-agent orchestration engine — a CLI that sits above existing agent CLIs (claude-code, copilot-cli, ...). Inspired by Kingsman.",
   "keywords": [
     "agent",
@@ -23,15 +23,15 @@
   "bugs": {
     "url": "https://github.com/unliftedq/kman/issues"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "Qiao Wang <wangqiao11@hotmail.com>",
   "type": "module",
   "bin": {
-    "kman": "./dist/main.js"
+    "kman": "dist/main.js"
   },
   "main": "./dist/main.js",
   "files": [
-    "dist",
+    "dist/main.js",
     "README.md",
     "LICENSE"
   ],
