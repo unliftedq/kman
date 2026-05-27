@@ -6,6 +6,7 @@ import { buildSkillsCommand } from './commands/skills.js';
 import { buildRunCommand } from './commands/run.js';
 import { buildChatCommand } from './commands/chat.js';
 import { buildVersionCommand } from './commands/version.js';
+import { buildDoctorCommand } from './commands/doctor.js';
 import { extractAgentOption } from './common/agent-option.js';
 
 function die(err: unknown): never {
@@ -46,6 +47,7 @@ program.addCommand(buildSkillsCommand());
 program.addCommand(buildRunCommand());
 program.addCommand(buildChatCommand());
 program.addCommand(buildVersionCommand());
+program.addCommand(buildDoctorCommand());
 
 let rawArgs: string[];
 try {
