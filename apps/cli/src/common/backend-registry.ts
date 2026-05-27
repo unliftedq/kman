@@ -1,6 +1,6 @@
-import { createClaudeCodeBackend } from '@delego/backend-claude-code';
-import { createCopilotCliBackend } from '@delego/backend-copilot-cli';
-import { UserError, type Backend, type BackendName } from '@delego/types';
+import { createClaudeCodeBackend } from '@kman/backend-claude-code';
+import { createCopilotCliBackend } from '@kman/backend-copilot-cli';
+import { UserError, type Backend, type BackendName } from '@kman/types';
 
 const BACKENDS: Record<string, () => Backend> = {
   'claude-code': createClaudeCodeBackend,

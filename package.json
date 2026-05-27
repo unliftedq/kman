@@ -1,8 +1,8 @@
 {
-  "name": "delego",
+  "name": "kman",
   "private": true,
   "version": "0.0.0",
-  "description": "Multi-agent orchestration engine — monorepo root",
+  "description": "kman — multi-agent orchestration engine, inspired by Kingsman. Monorepo root.",
   "type": "module",
   "workspaces": [
     "apps/*",
@@ -13,7 +13,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "clean": "turbo run clean && rm -rf node_modules .turbo",
-    "delego": "bun apps/cli/src/main.ts"
+    "kman": "bun apps/cli/src/main.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

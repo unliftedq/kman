@@ -1,5 +1,5 @@
 import { isAbsolute, resolve } from 'node:path';
-import { UserError } from '@delego/types';
+import { UserError } from '@kman/types';
 
 export type ParsedSource =
   | { kind: 'local'; path: string; subpath?: string; ref?: string }

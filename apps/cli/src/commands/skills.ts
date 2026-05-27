@@ -8,8 +8,8 @@ import {
   updateSkill,
   vendorSkill,
   type DiscoveredSkill,
-} from '@delego/skills';
-import { UserError } from '@delego/types';
+} from '@kman/skills';
+import { UserError } from '@kman/types';
 import { requireAgent } from '../common/agent-option.js';
 import { readStdinLine } from '../common/stdin.js';
 

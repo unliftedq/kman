@@ -1,7 +1,7 @@
 import { cp, mkdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { agentSkillsDir } from '@delego/core';
-import { UserError } from '@delego/types';
+import { agentSkillsDir } from '@kman/core';
+import { UserError } from '@kman/types';
 import type { DiscoveredSkill } from './discover.js';
 import { formatSourceString, sourceUrl, writeManifest, type SkillManifest } from './manifest.js';
 import type { ParsedSource } from './source-parser.js';

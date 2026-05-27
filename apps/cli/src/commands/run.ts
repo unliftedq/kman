@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { buildContext, launchRun, readProfile } from '@delego/core';
-import { UserError, type OutputFormat, type PermissionLevel } from '@delego/types';
+import { buildContext, launchRun, readProfile } from '@kman/core';
+import { UserError, type OutputFormat, type PermissionLevel } from '@kman/types';
 import { requireAgent } from '../common/agent-option.js';
 import { resolveBackend } from '../common/backend-registry.js';
 import { parseOutputFormat, parsePermission } from '../common/run-args.js';

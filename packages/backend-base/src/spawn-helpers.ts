@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
-import type { AgentContext } from '@delego/types';
+import type { AgentContext } from '@kman/types';
 
 export interface SpawnArgs {
   command: string;

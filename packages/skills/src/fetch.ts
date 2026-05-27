@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BackendUnavailableError, UserError } from '@delego/types';
+import { BackendUnavailableError, UserError } from '@kman/types';
 import type { ParsedSource } from './source-parser.js';
 
 /**

@@ -1,5 +1,5 @@
 import type { ChildProcess } from 'node:child_process';
-import { spawnBackend } from '@delego/backend-base';
+import { spawnBackend } from '@kman/backend-base';
 import type {
   AgentContext,
   Backend,
@@ -7,7 +7,7 @@ import type {
   ChatOptions,
   PermissionLevel,
   RunOptions,
-} from '@delego/types';
+} from '@kman/types';
 
 /**
  * GitHub Copilot CLI adapter. v1 honest capability flags: Copilot CLI does not

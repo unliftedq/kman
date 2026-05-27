@@ -1,6 +1,6 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
-import { UserError } from '@delego/types';
+import { UserError } from '@kman/types';
 
 export interface DiscoveredSkill {
   /** Skill name derived from its directory basename. */

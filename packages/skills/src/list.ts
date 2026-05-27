@@ -1,6 +1,6 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { agentSkillsDir } from '@delego/core';
+import { agentSkillsDir } from '@kman/core';
 import { readManifest, type SkillManifest } from './manifest.js';
 
 export interface InstalledSkill {

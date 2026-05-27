@@ -5,7 +5,7 @@ import {
   type ContextOverrides,
   type Profile,
   UserError,
-} from '@delego/types';
+} from '@kman/types';
 import { agentDir, agentSoulPath } from '../paths.js';
 
 /**

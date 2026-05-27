@@ -9,8 +9,8 @@ import {
   readProfile,
   validateAgentName,
   writeProfile,
-} from '@delego/core';
-import { UserError } from '@delego/types';
+} from '@kman/core';
+import { UserError } from '@kman/types';
 import { readStdinLine } from '../common/stdin.js';
 
 export function buildAgentCommand(): Command {

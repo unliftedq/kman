@@ -1,4 +1,4 @@
-import type { AgentContext } from '@delego/types';
+import type { AgentContext } from '@kman/types';
 
 /**
  * Render the soul prompt for append-system-prompt injection. v1 is a no-op

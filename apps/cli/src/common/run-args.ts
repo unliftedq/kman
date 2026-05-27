@@ -1,4 +1,4 @@
-import { UserError } from '@delego/types';
+import { UserError } from '@kman/types';
 
 export function parsePermission(value: string): 'ask' | 'auto' | 'yolo' {
   if (value === 'ask' || value === 'auto' || value === 'yolo') return value;

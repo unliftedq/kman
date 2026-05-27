@@ -1,7 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { agentSkillsDir } from '@delego/core';
-import { UserError } from '@delego/types';
+import { agentSkillsDir } from '@kman/core';
+import { UserError } from '@kman/types';
 import { discoverSkills } from './discover.js';
 import { materialize } from './fetch.js';
 import {

@@ -1,6 +1,5 @@
-#!/usr/bin/env bun
 import { Command, CommanderError } from 'commander';
-import { DelegoError, ExitCode } from '@delego/types';
+import { DelegoError, ExitCode } from '@kman/types';
 import { buildAgentCommand } from './commands/agent.js';
 import { buildSkillsCommand } from './commands/skills.js';
 import { buildRunCommand } from './commands/run.js';
@@ -10,7 +9,7 @@ import { extractAgentOption } from './common/agent-option.js';
 
 function die(err: unknown): never {
   if (err instanceof DelegoError) {
-    if (err.message) process.stderr.write(`delego: ${err.message}\n`);
+    if (err.message) process.stderr.write(`kman: ${err.message}\n`);
     process.exit(err.code);
   }
   // commander throws CommanderError for usage / unknown-command / missing-arg.
@@ -20,7 +19,7 @@ function die(err: unknown): never {
     process.exit(code);
   }
   const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`delego: unexpected error: ${message}\n`);
+  process.stderr.write(`kman: unexpected error: ${message}\n`);
   if (process.env['DELEGO_DEBUG'] && err instanceof Error && err.stack) {
     process.stderr.write(err.stack + '\n');
   }
@@ -29,9 +28,9 @@ function die(err: unknown): never {
 
 const program = new Command();
 program
-  .name('delego')
-  .description('Multi-agent orchestration engine.')
-  .version('0.0.0', '-v, --version', 'Print Delego CLI version.')
+  .name('kman')
+  .description('Multi-agent orchestration engine (inspired by Kingsman).')
+  .version('0.0.0', '-v, --version', 'Print kman CLI version.')
   .helpOption('-h, --help', 'Show help.')
   .showHelpAfterError()
   .exitOverride();

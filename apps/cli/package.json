@@ -1,27 +1,60 @@
 {
-  "name": "@delego/cli",
+  "name": "@unliftedq/kman",
   "version": "0.0.0",
-  "private": true,
+  "description": "Multi-agent orchestration engine — a CLI that sits above existing agent CLIs (claude-code, copilot-cli, ...). Inspired by Kingsman.",
+  "keywords": [
+    "agent",
+    "agents",
+    "multi-agent",
+    "orchestration",
+    "claude",
+    "claude-code",
+    "copilot",
+    "copilot-cli",
+    "ai",
+    "cli",
+    "kman"
+  ],
+  "homepage": "https://github.com/unliftedq/kman#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unliftedq/kman.git"
+  },
+  "bugs": {
+    "url": "https://github.com/unliftedq/kman/issues"
+  },
+  "license": "MIT",
+  "author": "Qiao Wang <wangqiao11@hotmail.com>",
   "type": "module",
   "bin": {
-    "delego": "./src/main.ts"
+    "kman": "./dist/main.js"
   },
-  "main": "./src/main.ts",
+  "main": "./dist/main.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "start": "bun run ./src/main.ts",
-    "build": "tsc -b",
+    "build": "bun run ./scripts/build.ts",
     "typecheck": "tsc -b",
-    "clean": "rm -rf dist .turbo *.tsbuildinfo"
-  },
-  "dependencies": {
-    "@delego/backend-claude-code": "workspace:*",
-    "@delego/backend-copilot-cli": "workspace:*",
-    "@delego/core": "workspace:*",
-    "@delego/skills": "workspace:*",
-    "@delego/types": "workspace:*",
-    "commander": "^14.0.3"
+    "clean": "rm -rf dist .tsbuild .turbo *.tsbuildinfo",
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
+    "@kman/backend-claude-code": "workspace:*",
+    "@kman/backend-copilot-cli": "workspace:*",
+    "@kman/core": "workspace:*",
+    "@kman/skills": "workspace:*",
+    "@kman/types": "workspace:*",
+    "commander": "^14.0.3",
     "typescript": "^5.6.0"
   }
 }

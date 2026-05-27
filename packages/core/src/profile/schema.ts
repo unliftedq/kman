@@ -4,7 +4,7 @@ import type {
   OutputFormat,
   PermissionLevel,
   Profile,
-} from '@delego/types';
+} from '@kman/types';
 
 export const KNOWN_BACKENDS: readonly BackendName[] = ['claude-code', 'copilot-cli'];
 export const PERMISSION_LEVELS: readonly PermissionLevel[] = ['ask', 'auto', 'yolo'];

@@ -1,5 +1,5 @@
 {
-  "name": "@delego/backend-claude-code",
+  "name": "@kman/backend-claude-code",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "@delego/backend-base": "workspace:*",
-    "@delego/types": "workspace:*"
+    "@kman/backend-base": "workspace:*",
+    "@kman/types": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

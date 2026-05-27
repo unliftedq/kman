@@ -1,35 +1,38 @@
-# Delego
+# kman
 
-Multi-agent orchestration engine — see [docs/DESIGN.md](docs/DESIGN.md).
+Multi-agent orchestration engine, *inspired by [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)* — a small society of named, well-tailored agents you can dispatch on a mission. See [docs/DESIGN.md](docs/DESIGN.md) for the architecture (the design doc still uses the project's working name "delego" internally; only the published CLI and binary are branded `kman`).
 
 ## Layout
 
 ```
-delego/
-├── apps/cli                     # @delego/cli — citty-based CLI
-├── packages/
-│   ├── types                    # @delego/types — interfaces
-│   ├── core                     # @delego/core — profile, context, prompt, launcher
-│   ├── skills                   # @delego/skills — fetch + vendor SKILL.md sources
-│   ├── backend-base             # @delego/backend-base — spawn helpers
-│   ├── backend-claude-code      # @delego/backend-claude-code
-│   └── backend-copilot-cli      # @delego/backend-copilot-cli
+.
+├── apps/cli                       # @unliftedq/kman — the published CLI (binary: kman)
+├── packages/                      # all internal, all private (not published)
+│   ├── types                      # @kman/types — shared interfaces
+│   ├── core                       # @kman/core — profile, context, prompt, launcher
+│   ├── skills                     # @kman/skills — fetch + vendor SKILL.md sources
+│   ├── backend-base               # @kman/backend-base — spawn helpers
+│   ├── backend-claude-code        # @kman/backend-claude-code
+│   └── backend-copilot-cli        # @kman/backend-copilot-cli
 └── docs/DESIGN.md
 ```
+
+Only `@unliftedq/kman` is intended for npm publication; every workspace package under `packages/` is marked `"private": true`.
 
 ## Toolchain
 
 - Bun ≥ 1.2
-- TypeScript 5.6
+- TypeScript 5.9
 - Turborepo 2.x
+- commander 14.x
 
 ## Quick start (dev)
 
 ```bash
 bun install
-bun run --filter @delego/cli start -- --help
-bun run --filter @delego/cli start -- agent create foo
-bun run --filter @delego/cli start -- agent list
+bun run kman --help
+bun run kman agent create coder
+bun run kman agent list
 ```
 
-When installed globally (`bun install -g @delego/cli`), the binary is just `delego`.
+Once published and installed globally (`bun install -g @unliftedq/kman`), the binary is just `kman`.

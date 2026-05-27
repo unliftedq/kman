@@ -5,7 +5,7 @@ import {
   type DefaultsConfig,
   type Profile,
   UserError,
-} from '@delego/types';
+} from '@kman/types';
 import { agentProfilePath } from '../paths.js';
 import { defaultProfile } from './schema.js';
 import { validateProfile } from './validate.js';

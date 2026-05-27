@@ -2,7 +2,7 @@ import {
   AGENT_NAME_PATTERN,
   type Profile,
   UserError,
-} from '@delego/types';
+} from '@kman/types';
 import { OUTPUT_FORMATS, PERMISSION_LEVELS } from './schema.js';
 
 export function validateAgentName(name: string): void {

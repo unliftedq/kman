@@ -1,5 +1,5 @@
 {
-  "name": "@delego/core",
+  "name": "@kman/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "@delego/types": "workspace:*",
+    "@kman/types": "workspace:*",
     "@iarna/toml": "^2.2.5"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import { UserError } from '@delego/types';
+import { UserError } from '@kman/types';
 
 export interface ExtractResult {
   rest: string[];

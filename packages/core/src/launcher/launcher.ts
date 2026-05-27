@@ -4,7 +4,7 @@ import {
   ExitCode,
   type AgentContext,
   type Backend,
-} from '@delego/types';
+} from '@kman/types';
 
 export interface LaunchResult {
   exitCode: number;

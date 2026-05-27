@@ -1,7 +1,7 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import TOML from '@iarna/toml';
-import type { Profile } from '@delego/types';
+import type { Profile } from '@kman/types';
 import { agentProfilePath } from '../paths.js';
 import { validateProfile } from './validate.js';
 
