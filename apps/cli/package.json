@@ -1,0 +1,27 @@
+{
+  "name": "@delego/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "delego": "./src/main.ts"
+  },
+  "main": "./src/main.ts",
+  "scripts": {
+    "start": "bun run ./src/main.ts",
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@delego/backend-claude-code": "workspace:*",
+    "@delego/backend-copilot-cli": "workspace:*",
+    "@delego/core": "workspace:*",
+    "@delego/skills": "workspace:*",
+    "@delego/types": "workspace:*",
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

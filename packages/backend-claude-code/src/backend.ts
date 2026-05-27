@@ -1,0 +1,103 @@
+import type { ChildProcess } from 'node:child_process';
+import { spawnBackend } from '@delego/backend-base';
+import type {
+  AgentContext,
+  Backend,
+  BackendCapabilities,
+  ChatOptions,
+  PermissionLevel,
+  RunOptions,
+} from '@delego/types';
+
+/**
+ * Claude Code adapter (§3.3). Loads agent dir directly via --plugin-dir.
+ *
+ * Permission mapping (abstract → claude-code's --permission-mode):
+ *   ask    → default
+ *   auto   → acceptEdits
+ *   yolo   → bypassPermissions
+ */
+const PERMISSION_MAP: Record<PermissionLevel, string> = {
+  ask: 'default',
+  auto: 'acceptEdits',
+  yolo: 'bypassPermissions',
+};
+
+export class ClaudeCodeBackend implements Backend {
+  readonly name = 'claude-code';
+  readonly capabilities: BackendCapabilities = {
+    supportClaudeCodePlugin: true,
+    supportsAppendSystemPrompt: true,
+    supportsNativeResume: true,
+  };
+
+  private readonly binary: string;
+
+  constructor(binary?: string) {
+    this.binary = binary ?? process.env['DELEGO_CLAUDE_BIN'] ?? 'claude';
+  }
+
+  mapPermission(level: PermissionLevel): string {
+    return PERMISSION_MAP[level] ?? 'default';
+  }
+
+  async spawn(ctx: AgentContext, _opts?: RunOptions): Promise<ChildProcess> {
+    const args = this.buildArgs(ctx, /* interactive */ false);
+    return spawnBackend(ctx, { command: this.binary, args });
+  }
+
+  async chat(ctx: AgentContext, _opts?: ChatOptions): Promise<ChildProcess> {
+    const args = this.buildArgs(ctx, /* interactive */ true);
+    return spawnBackend(ctx, { command: this.binary, args });
+  }
+
+  private buildArgs(ctx: AgentContext, interactive: boolean): string[] {
+    const args: string[] = [];
+
+    // Plugin directory — load the agent dir as a Claude Code plugin (§4, §3.3).
+    args.push('--plugin-dir', ctx.agentDir);
+
+    // Soul prompt as append-system-prompt (§3.2).
+    if (ctx.soulPrompt.trim().length > 0) {
+      args.push('--append-system-prompt', ctx.soulPrompt);
+    }
+
+    // Model override.
+    if (ctx.model) {
+      args.push('--model', ctx.model);
+    }
+
+    // Permission mode: raw escape hatch wins over abstract.
+    const pmode = ctx.permissionModeRaw ?? this.mapPermission(ctx.permission);
+    args.push('--permission-mode', pmode);
+
+    // Max turns.
+    if (ctx.maxTurns !== undefined) {
+      args.push('--max-turns', String(ctx.maxTurns));
+    }
+
+    // Output format — only meaningful in non-interactive mode.
+    if (!interactive) {
+      args.push('--output-format', ctx.outputFormat);
+      if (ctx.stream && ctx.outputFormat === 'stream-json') {
+        args.push('--include-partial-messages');
+      }
+    }
+
+    // Extra backend-native args from profile + --runtime-flag.
+    for (const extra of ctx.extraArgs) {
+      args.push(extra);
+    }
+
+    // Task: passed via -p/--print in non-interactive mode.
+    if (!interactive && ctx.task !== undefined) {
+      args.push('--print', ctx.task);
+    }
+
+    return args;
+  }
+}
+
+export function createClaudeCodeBackend(binary?: string): ClaudeCodeBackend {
+  return new ClaudeCodeBackend(binary);
+}
