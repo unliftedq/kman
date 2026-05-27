@@ -9,8 +9,8 @@
 Delego is **not** another agent runtime. It is an **orchestrator** that sits above existing CLI agents (`claude-code`, `copilot-cli`, and later `codex`, `gemini`, ...) and gives them three things they currently lack as a system:
 
 1. **Named agent profiles** — each agent has its own soul, plugin files, and default runtime, addressable by name.
-2. **Frictionless multi-agent composition** — any agent can call any other agent through a generated MCP server, with no backend-specific glue.
-3. **Backend-agnostic CLI** — one set of commands, one profile format, one session log, regardless of which underlying CLI agent does the work.
+2. **Backend-agnostic CLI** — one set of commands, one profile format, regardless of which underlying CLI agent does the work.
+3. **Claude Code plugin compatibility** — every Delego agent directory is also a valid Claude Code plugin, so skills / hooks / MCP servers / commands written for the broader ecosystem work unchanged.
 
 Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v1 deliberately ships only the CLI.
 
@@ -19,12 +19,16 @@ Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v
 ## 2. Non-Goals (v1)
 
 - **No own LLM runtime.** Delego never calls an LLM API directly. All inference happens inside the chosen backend.
-- **No workflow DSL.** No `delego flow` command, no YAML pipelines. Multi-agent orchestration in v1 is either (a) shell composition / pipes, or (b) one agent calling another via the auto-injected MCP server.
+- **No workflow DSL.** No `delego flow` command, no YAML pipelines. Multi-agent orchestration in v1 is shell composition / pipes only.
+- **No session management.** v1 relies entirely on each backend's native session storage and resume. Delego does not capture, normalize, index, or search sessions, and ships no `sessions` subcommands. Cross-backend session UX is a [TODO](#10-roadmap).
+- **No agent-to-agent invocation.** v1 does not run an in-process Delego MCP server and does not auto-inject `delegate_<peer>` tools. Sub-agent composition is a [TODO](#10-roadmap).
+- **No `doctor` command.** Environment / backend / plugin diagnostics are deferred. v1 fails fast at run time with actionable errors; a dedicated `delego doctor` is a [TODO](#10-roadmap).
 - **No project-local profiles.** All agents live at `~/.delego/`. No `.delego/` in repos.
 - **No skill template system.** New agents start with an empty skills directory.
-- **No shell / HTTP custom tools.** v1 only wires MCP tools. Shell and HTTP tool adapters need a separate schema, timeout, quoting, and safety design.
-- **No Codex / Gemini adapters in v1.** v1 implements `claude-code` and `copilot-cli` first. Codex and Gemini wait until their plugin-loading adapter mechanisms are designed.
+- **No shell / HTTP custom tools.** v1 only wires MCP tools through `.mcp.json`. Shell / HTTP tool adapters need a separate schema, timeout, quoting, and safety design.
+- **No Codex / Gemini adapters in v1.** v1 implements `claude-code` and `copilot-cli` first.
 - **No config command in v1.** Global configuration commands are deferred until concrete global settings exist.
+- **No compiled binary distribution in v1.** v1 ships as an npm package consumed via `bun install -g @delego/cli`. Single-file native binaries (Bun `--compile`), Homebrew / Scoop / AUR packaging, and Docker images are [TODO](#10-roadmap).
 
 ---
 
@@ -34,30 +38,28 @@ Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v
 
 ```mermaid
 flowchart LR
-    user[User / CLI] -->|delego run --profile coder --task| cli[apps/cli<br/>citty]
+    user[User / CLI] -->|delego run --agent coder --task| cli[apps/cli<br/>citty]
     cli --> core[packages/core<br/>profile + context + launcher]
     core -->|build| ctx[AgentContext]
     ctx --> backend[Backend Adapter<br/>claude-code / copilot-cli]
-    ctx -.spawns.-> mcp[packages/mcp-server<br/>delego MCP<br/>delegate tools]
-    backend <-->|stdio MCP| mcp
-    mcp -->|delegate_writer| core
-    backend -->|stream-json events| log[~/.delego/agents/coder/<br/>sessions/&lt;id&gt;.jsonl]
+    backend -.loads as plugin.-> dir[~/.delego/agents/coder/<br/>Claude Code plugin layout]
+    backend -->|stdout / stderr| user
 ```
+
+Delego does not interpose on the backend's I/O stream. Backend output (text, JSON, or backend-native stream) goes directly to the user's terminal. Session state stays inside the backend's own storage.
 
 ### 3.2 The `AgentContext` — pipeline center
 
-Every `delego run` invocation builds an immutable `AgentContext` object **before** the backend is spawned. All downstream components — backend launcher, MCP server, hook runner, session writer — read from this single source of truth.
+Every `delego run` invocation builds an immutable `AgentContext` object **before** the backend is spawned. All downstream components — backend launcher, hook runner via the plugin — read from this single source of truth.
 
 ```mermaid
 flowchart TB
-    A[1. Resolve agent name from --profile] --> B[2. Load profile from<br/>~/.delego/agents/coder/agent.toml]
-    B --> C[3. Build AgentContext<br/>soul + plugin root<br/>+ runtime + defaults]
-    C --> D[4. Apply CLI overrides onto context<br/>--runtime / --permission / --output / ...]
-    D --> E[5. Render system prompt<br/>= soul.md + runtime context]
-    E --> F[6. Load agent plugin root<br/>skills + hooks + .mcp.json + bin]
-    F --> G[7. Spawn backend process<br/>with rendered prompt + plugin dir + tool policy]
-    G --> H[8. Stream events to stdout + session jsonl]
-    H --> I[9. On exit: persist session; backend fires configured hooks]
+    A[1. Resolve agent name from --agent] --> B[2. Load profile from<br/>~/.delego/agents/coder/agent.toml]
+    B --> C[3. Read soul prompt from soul.md]
+    C --> D[4. Build AgentContext<br/>profile + soul + runtime + defaults]
+    D --> E[5. Apply CLI overrides onto context<br/>--runtime / --permission / --model / ...]
+    E --> F[6. Spawn backend with the agent directory<br/>as a Claude Code plugin + rendered soul prompt]
+    F --> G[7. Backend stdout/stderr stream to the user]
 ```
 
 CLI overrides act on the **context**, not on the raw profile. Profile stays immutable on disk.
@@ -66,109 +68,88 @@ Agent names are lowercase kebab-case: `^[a-z][a-z0-9-]{0,62}$`. Names are case-s
 
 ### 3.3 Backend adapter interface
 
-Each backend lives in its own package (`packages/backend-<name>/`). v1 ships `claude-code` and `copilot-cli` adapters. Codex and Gemini are deferred until their plugin-loading adapter mechanisms are designed. Adapters implement a common `Backend` interface:
+Each backend lives in its own package (`packages/backend-<name>/`). v1 ships `claude-code` and `copilot-cli` adapters. Adapters implement a common `Backend` interface:
 
 ```ts
 interface Backend {
   readonly name: string;
   readonly capabilities: BackendCapabilities;
 
-  /** Spawn a one-shot run, returning a stream of normalized events. */
-  spawn(ctx: AgentContext, opts: RunOptions): AsyncIterable<DelegoEvent>;
+  /** Spawn a one-shot run; stdout/stderr are passed through to the caller. */
+  spawn(ctx: AgentContext, opts: RunOptions): Promise<ChildProcess>;
 
   /** Spawn an interactive REPL, passing stdin/stdout through transparently. */
   chat(ctx: AgentContext, opts: ChatOptions): Promise<ChildProcess>;
 
   /** Map abstract permission level to backend-native mode. */
   mapPermission(level: 'ask' | 'auto' | 'yolo'): string;
-
-  /** How to resume — native session id, transcript replay, or unsupported. */
-  resumeStrategy: 'native' | 'replay' | 'unsupported';
 }
 
 interface BackendCapabilities {
-  supportsResume: boolean;
-  supportsMcp: boolean;
-  supportsStreamJson: boolean;
+  /** Can load the agent directory as a Claude Code plugin via --plugin-dir. */
+  supportClaudeCodePlugin: boolean;
+  /** Can accept Delego's rendered soul as an additional system prompt. */
   supportsAppendSystemPrompt: boolean;
+  /** Exposes a native --resume / --continue style flag. */
+  supportsNativeResume: boolean;
 }
 ```
 
-Capability handling is fail-fast for required launch behavior: if a selected backend cannot accept the rendered system prompt or requested output mode, Delego exits with code 4 before spawning. If `supportsMcp = false`, Delego does not inject MCP servers; delegate tools are unavailable for that run and `delego doctor` reports the limitation.
+Capability handling is fail-fast for required launch behavior: if a selected backend cannot accept the rendered soul prompt, Delego exits with code 4 before spawning.
 
-Backend adapters receive the agent directory as the plugin root. For `claude-code` and `copilot-cli`, Delego passes that directory directly via the backend's `--plugin-dir` flag. Later adapters must either map the same plugin root into their native concepts or explicitly declare unsupported plugin features.
+For backends with `supportClaudeCodePlugin = true` (claude-code in v1), Delego passes the agent directory directly via the backend's `--plugin-dir`. For other backends (copilot-cli, future codex/gemini), the adapter is responsible for translating the relevant subset of the plugin layout (skills, hooks, MCP servers) into the backend's native concepts, or declaring those features unsupported.
 
-Normalized event shape (what backends produce, what `--output stream-json` emits):
+### 3.4 Multi-agent invocation (deferred — TODO)
 
-```ts
-type DelegoEvent =
-  | { type: 'message'; role: 'assistant' | 'user'; content: string; ts: string }
-  | { type: 'tool_use'; tool: string; input: unknown; ts: string }
-  | { type: 'tool_result'; tool: string; output: unknown; ts: string; ok: boolean }
-  | { type: 'usage'; turns: number; input_tokens: number; output_tokens: number; cost_usd?: number }
-  | { type: 'error'; message: string; recoverable: boolean }
-  | { type: 'end'; reason: 'completed' | 'aborted' | 'error'; session_id: string };
-```
+v1 does not ship an in-process Delego MCP server, `delegate_<peer>` tools, or any auto-injected delegation mechanism. Composing agents in v1 is done exclusively with shell pipes (§7).
 
-### 3.4 The `delego` MCP server (in-process or standalone)
+The following are explicitly deferred:
 
-A single TypeScript implementation in `packages/mcp-server/` powers both:
+- In-process per-run Delego MCP server.
+- One MCP tool per peer agent (`delegate_<peer>`), with depth and cycle protection via a `DELEGO_RUN_CHAIN` env var.
+- Standalone long-lived Delego MCP server mode for IDE / external host integrations.
 
-- **In-process per-run mode** — spawned as a stdio MCP server child of each `delego run`, bound to that agent's context. The backend sees one extra MCP server named `delego`.
-- **Standalone mode** — the same server can run as a long-lived process for IDE / external integrations, bound to a selected agent by the launcher or host integration.
-
-Tools exposed:
-
-| Tool | Action | Scope |
-|---|---|---|
-| `delegate_<peer>` | `(task: string, options?)` — invokes another agent | One tool per known peer agent (C2 granularity). The calling agent is excluded from the catalog to prevent self-loops. |
-
-Delegate tool names are derived from agent names by replacing `-` with `_`: `code-reviewer` becomes `delegate_code_reviewer`. Because `_` is not allowed in agent names, this mapping is collision-free.
+They are intentionally left out until backend stability and session strategy are settled.
 
 ---
 
 ## 4. Storage Layout
 
+Every Delego agent directory is a valid Claude Code plugin, following the [Claude Code plugin spec](https://code.claude.com/docs/en/plugins-reference). Backends that natively understand Claude Code plugins load the directory directly; other adapters read the same files through their own translation layer.
+
 ```
 ~/.delego/
 └── agents/
-  └── coder/                          # 2: agent profile (global only)
-    ├── agent.toml                  # 4: TOML profile
-    ├── soul.md                     # 5: system prompt
-    ├── .mcp.json                   # 12: per-agent MCP server config
-    ├── skills/                     # 11: per-agent vendored
+  └── coder/                          # agent directory = Claude Code plugin
+    ├── agent.toml                  # Delego profile (runtime, model, defaults)
+    ├── soul.md                     # Delego system prompt (passed as append-system-prompt)
+    ├── skills/                     # Claude Code skills: <name>/SKILL.md
     │   └── humanizer/
     │       ├── SKILL.md
-    │       ├── .delego-skill.json  # source/version manifest
-    │       └── ...
-    ├── settings.json               # 18: plugin settings, including hooks
-    ├── hooks/                      # per-agent hook scripts
-    │   ├── check-env
-    │   ├── notify
-    │   └── session-end
-    ├── bin/                        # executables exposed while plugin is enabled
-    │   └── helper
-    ├── sessions/                   # 16: unified jsonl session log
-    │   ├── index.db                # sqlite FTS5 for search
-    │   ├── 20260525-091247-abc123.jsonl
-    │   └── ...
+    │       └── .delego-skill.json  # vendoring manifest (source / version / checksum)
+    ├── agents/                     # Claude Code subagent definitions (optional)
+    ├── commands/                   # Claude Code flat slash commands (optional)
+    ├── hooks/
+    │   └── hooks.json              # Claude Code hook configuration
+    ├── scripts/                    # Hook / utility scripts referenced from hooks.json
+    │   ├── check-env.sh
+    │   └── notify.sh
+    ├── .mcp.json                   # Claude Code MCP server configuration
+    ├── bin/                        # Executables added to backend Bash PATH
+    ├── .claude-plugin/              # Optional; only needed if the user wants a plugin manifest
+    │   └── plugin.json              #   metadata, version, userConfig, ... (hand-authored)
     └── logs/
-      └── agent.log               # delego-side diagnostic log (separate from session events)
+      └── agent.log               # Delego-side diagnostic log (not session data)
 ```
 
-The agent directory is also the plugin root loaded by compatible backends:
+Notes on the layout:
 
-| Path | Scope | Purpose |
-|---|---|---|
-| `skills/` | Plugin root | Skills as `<name>/SKILL.md` directories. |
-| `settings.json` | Plugin root | Plugin settings, including hook event handlers. |
-| `hooks/` | Plugin root | Per-agent hook scripts referenced by `settings.json`. |
-| `.mcp.json` | Plugin root | MCP server configurations. |
-| `bin/` | Plugin root | Executables added to backend-exposed Bash/shell tool execution and hook command `PATH` while the plugin is enabled. |
-
-Secrets never live in `agent.toml`, `settings.json`, or `.mcp.json`. Secret values are supplied through the launch environment or backend-native secret handling, then referenced from plugin files without storing plaintext secrets.
-
-`bin/` never mutates Delego's own process `PATH`; it only affects backend-exposed Bash/shell tool execution and hook commands while the plugin is enabled.
+- **Delego-specific files** are `agent.toml`, `soul.md`, and `.delego-skill.json` inside each vendored skill. Claude Code ignores top-level fields and files it does not recognize, so these coexist cleanly with the plugin spec.
+- **Plugin manifest is optional.** Claude Code auto-discovers components in their default locations and derives the plugin name from the directory name, so an agent directory loads as a valid plugin without `.claude-plugin/plugin.json`. Add one only when you need metadata (`version`, `description`, `userConfig`, custom component paths, ...). Delego does not create or maintain it.
+- **Path substitution** inside plugin files uses Claude Code's variables: `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_PLUGIN_DATA}`, `${CLAUDE_PROJECT_DIR}`, `${user_config.KEY}`, and `${ENV_VAR}`.
+- **Secrets** are never stored in plain config. Use Claude Code's `userConfig` with `"sensitive": true` in `plugin.json`, or supply secrets through the launch environment, then reference them via `${user_config.KEY}` / `${ENV_VAR}` in `.mcp.json` and `hooks/hooks.json`.
+- **`bin/`** follows Claude Code semantics: executables become bare commands inside the backend's Bash tool while the plugin is enabled. It does not mutate Delego's own process `PATH`.
+- **No `sessions/` directory.** Sessions live in the backend's own storage. Delego does not write a unified session log in v1.
 
 ---
 
@@ -185,7 +166,7 @@ default = "claude-code"                  # claude-code | copilot-cli in v1
 model   = "claude-sonnet-4.5"            # passed to backend; backend default if omitted
 
 [soul]
-prompt_file = "soul.md"                  # relative to agent dir
+prompt_file = "soul.md"                  # relative to agent dir; default "soul.md"
 
 [defaults]
 max_turns       = 50
@@ -203,13 +184,15 @@ extra_args = ["--some-native-flag"]
 
 ### 5.2 `~/.delego/agents/<name>/.mcp.json`
 
+Standard Claude Code plugin MCP configuration:
+
 ```json
 {
   "mcpServers": {
     "github": {
       "command": "npx",
       "args": ["@modelcontextprotocol/server-github"],
-      "env": { "LOG_LEVEL": "info", "GITHUB_TOKEN": "$GITHUB_TOKEN" }
+      "env": { "GITHUB_TOKEN": "${user_config.github_token}" }
     },
     "playwright": {
       "command": "npx",
@@ -219,9 +202,13 @@ extra_args = ["--some-native-flag"]
 }
 ```
 
-MCP configuration is per-agent and loaded from that agent's plugin root. `.mcp.json` uses the Claude Code project MCP config shape. Delego also auto-injects its internal `delego` MCP server for delegate tools when the backend supports MCP. The MCP server name `delego` is reserved; if `.mcp.json` defines that server name or any tool conflicts with generated `delegate_<peer>` tools, Delego exits with code 2 before spawning the backend. If `.mcp.json` references an invalid server or command shape, Delego exits with code 2 before spawning the backend.
+`.mcp.json` is loaded by the backend through its Claude Code plugin support. If the backend does not support MCP servers, the file is ignored.
 
-### 5.3 `~/.delego/agents/<name>/settings.json`
+If `.mcp.json` references an invalid server or command shape, Delego exits with code 2 before spawning the backend.
+
+### 5.3 `~/.delego/agents/<name>/hooks/hooks.json`
+
+Hook configuration uses the Claude Code plugin hook format. Scripts live under `scripts/` and are referenced via `${CLAUDE_PLUGIN_ROOT}`:
 
 ```json
 {
@@ -229,32 +216,32 @@ MCP configuration is per-agent and loaded from that agent's plugin root. `.mcp.j
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "hooks/check-env" }]
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/check-env.sh" }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
-        "hooks": [{ "type": "command", "command": "hooks/notify" }]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [{ "type": "command", "command": "hooks/session-end" }]
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/notify.sh" }
+        ]
       }
     ]
   }
 }
 ```
 
-Hook configuration follows the existing Claude Code settings format: a top-level `hooks` object keyed by hook event name, where each event maps to matcher groups with `hooks` entries. Hook commands are resolved from the plugin root when relative. Per-agent hook scripts live under `hooks/`. `bin/` executables are added to backend-exposed Bash/shell tool execution and hook command `PATH` while the plugin is enabled.
+Supported hook events, types, and matcher semantics are exactly those defined by Claude Code's plugin hook system (see [Plugins reference → Hooks](https://code.claude.com/docs/en/plugins-reference)). Backends that do not implement a given hook event silently ignore it.
 
 ### 5.4 Vendored skill manifest — `<agent>/skills/<skill>/.delego-skill.json`
 
 ```json
 {
-  "source": "agentskills:humanizer",
-  "source_url": "https://agentskills.io/skills/humanizer@v1.3.2",
+  "source": "vercel-labs/agent-skills",
+  "source_url": "https://github.com/vercel-labs/agent-skills",
+  "ref": "v1.3.2",
   "installed_at": "2026-05-25T09:12:47Z",
   "version": "git-sha-abc123",
   "checksum": "sha256:..."
@@ -265,7 +252,7 @@ Hook configuration follows the existing Claude Code settings format: a top-level
 
 Installed skill directories are the source of truth. A skill is active when `<agent>/skills/<skill>/` exists. `agent.toml` does not duplicate the installed skill list. v1 installs skills by copying directly into the target agent's `skills/` directory; no canonical cache or symlink mode is used.
 
-Skill source parsing follows the `vercel-labs/skills` model: parse the source first, then discover skill directories by finding `SKILL.md` files. Sources may be local paths, GitHub/GitLab URLs, GitHub shorthand (`owner/repo`, `owner/repo/path`, `owner/repo@skill`), direct git URLs, branch/ref selectors, or well-known skill endpoints. Subpaths must be sanitized so they cannot escape the cloned repository. Discovery checks direct skill paths first, then common skill roots such as `skills/`, `.agents/skills/`, `.claude/skills/`, and other agent-specific skills directories, and finally bounded recursive search.
+Skill source parsing follows the `vercel-labs/skills` model: parse the source first, then discover skill directories by finding `SKILL.md` files. Sources may be local paths, GitHub/GitLab URLs, GitHub shorthand (`owner/repo`, `owner/repo/path`, `owner/repo@ref`), direct git URLs, branch/ref selectors, or well-known skill endpoints. Subpaths must be sanitized so they cannot escape the cloned repository. Discovery checks direct skill paths first, then common skill roots such as `skills/`, `.claude/skills/`, and other agent-specific skills directories, and finally bounded recursive search.
 
 When a source resolves to multiple skills and the user did not pass `--skill` or `--all`, Delego opens an interactive multi-select picker so the user can choose exactly which skills to install. Interactivity is detected with stdin/stdout TTY checks. In non-interactive mode, Delego exits with code 2 and prints the discovered skill names, instructing the user to pass one or more `--skill` options or `--all`.
 
@@ -273,14 +260,14 @@ When a source resolves to multiple skills and the user did not pass `--skill` or
 
 ## 6. CLI Reference
 
-All commands follow strict noun-verb grammar (Decision 1). No dynamic agent-as-subcommand. Agent management commands may use positional agent names for readability; other user-provided values are passed through options.
+All commands follow strict noun-verb grammar. No dynamic agent-as-subcommand. Agent management commands may use positional agent names for readability; other user-provided values are passed through options.
 
-Agent-scoped commands select the target agent with the global `-p, --profile <agent>` option. `--profile` is accepted before or after subcommands. If `--profile` appears more than once, Delego exits with code 2. Agent-scoped commands require `--profile`; non-agent commands reject it unless explicitly documented.
+Agent-scoped commands select the target agent with the global `-a, --agent <name>` option. `--agent` is accepted before or after subcommands. If `--agent` appears more than once, Delego exits with code 2. Agent-scoped commands require `--agent`; non-agent commands reject it unless explicitly documented.
 
 ```bash
-delego skills list --profile coder
-delego -p coder skills list
-delego --profile coder sessions list
+delego skills list --agent coder
+delego -a coder skills list
+delego --agent coder run --task "..."
 ```
 
 ### 6.1 Agent lifecycle
@@ -290,25 +277,27 @@ delego agent create coder [flags]
   --runtime <backend>          # default backend (claude-code, copilot-cli)
   --model <id>                 # default model
   --description "<text>"
-  --soul "<text>"              
+  --soul "<text>"
 
 delego agent list                                       # all agents
-delego agent show coder                          # profile + paths
+delego agent show coder                                 # profile + paths
 delego agent delete coder [--yes]
 delego agent rename coder reviewer
 ```
 
+`delego agent create` does not write `.claude-plugin/plugin.json`. Claude Code treats a directory without a manifest as a valid plugin, deriving the plugin name from the directory name. Users add `.claude-plugin/plugin.json` by hand only if they need metadata such as `version`, `description`, or `userConfig`.
+
 ### 6.2 Skills
 
 ```bash
-delego skills add --profile coder --source vercel-labs/agent-skills
-delego skills add --profile coder --source vercel-labs/agent-skills --skill humanizer
-delego skills add --profile coder --source vercel-labs/agent-skills --all
-delego skills list   --profile coder
-delego skills show   --profile coder --skill humanizer
-delego skills update --profile coder --skill humanizer [--force]
-delego skills update --profile coder --all
-delego skills remove --profile coder --skill humanizer
+delego skills add    --agent coder --source vercel-labs/agent-skills [--ref <branch|tag|sha>]
+delego skills add    --agent coder --source vercel-labs/agent-skills --skill humanizer
+delego skills add    --agent coder --source vercel-labs/agent-skills --all
+delego skills list   --agent coder
+delego skills show   --agent coder --skill humanizer
+delego skills update --agent coder --skill humanizer [--force]
+delego skills update --agent coder --all
+delego skills remove --agent coder --skill humanizer
 ```
 
 `skills add` discovers all candidate `SKILL.md` directories from `--source`. If there is exactly one candidate, it installs it. If there are multiple candidates, `--skill` filters by skill name, `--all` installs every candidate, and the interactive picker is used only when neither option is provided.
@@ -318,91 +307,78 @@ delego skills remove --profile coder --skill humanizer
 Delego does not provide `mcp` or `hook` subcommands. Users edit plugin files directly:
 
 - `~/.delego/agents/<name>/.mcp.json` for per-agent MCP servers.
-- `~/.delego/agents/<name>/settings.json` for hook configuration.
-- `~/.delego/agents/<name>/hooks/` for hook scripts referenced by `settings.json`.
+- `~/.delego/agents/<name>/hooks/hooks.json` for hook configuration.
+- `~/.delego/agents/<name>/scripts/` for hook / utility scripts referenced by `hooks.json`.
+- `~/.delego/agents/<name>/.claude-plugin/plugin.json` (optional) for plugin metadata and `userConfig` declarations — hand-authored when needed.
 
-Hook events follow the backend hook system. For Claude-compatible backends, `settings.json` uses the same shape as Claude Code hooks, including events such as `PreToolUse`, `PostToolUse`, `Notification`, `SessionStart`, and `SessionEnd`.
+Format, events, environment variables, and path substitution all follow the Claude Code plugin spec.
 
 ### 6.4 Run / chat
 
 ```bash
-delego run --profile coder --task "..." [flags]
+delego run --agent coder --task "..." [flags]
   --runtime <backend>                # override profile default
   --model <id>                       # override
   --permission ask|auto|yolo         # abstract level
-  --runtime-flag key=value           # raw escape hatch
-  --output text|json|stream-json     # default text
-  --stream                           # implies --output stream-json if not set
-  --resume [<id>]                    # resume a specific session when id is supplied
-  --continue                         # resume latest session for this profile
+  --runtime-flag key=value           # raw escape hatch for backend-native flags
+  --output text|json|stream-json     # default text; passed through to backend
+  --stream                           # implies --output stream-json if not set; mutually exclusive with --output of a different value
   --cwd <path>                       # working directory for backend
 
-delego chat --profile coder [--runtime <backend>] [--resume [<id>] | --continue]
+delego chat --agent coder [--runtime <backend>]
 ```
 
-`--continue` is the canonical latest-session form. `--resume <id>` resumes a specific session. If `--resume` is provided without an id, it behaves like `--continue`.
+Resuming a previous conversation uses the backend's native mechanism, exposed via `--runtime-flag`:
+
+```bash
+# claude-code:
+delego run --agent coder --runtime-flag --continue --task "next step"
+delego chat --agent coder --runtime-flag --resume=<id>
+```
+
+A first-class, backend-neutral resume UX is a [TODO](#10-roadmap).
 
 Exit codes:
 
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | agent error (LLM/tool/backend reported) |
-| 2 | user error (bad CLI args, missing profile) |
+| 1 | agent error (LLM / tool / backend reported) |
+| 2 | user error (bad CLI args, missing agent) |
 | 3 | hook blocked execution |
 | 4 | backend not installed or unreachable |
 | 130 | interrupted (SIGINT) |
 
-### 6.5 Sessions
+### 6.5 Sessions (deferred — TODO)
 
-```bash
-delego sessions list   --profile coder [--limit N] [--since <date>]
-delego sessions show   --profile coder --id 20260525-091247-abc123 [--format text|json]
-delego sessions search --profile coder --query "auth bug"            # FTS5 over event content
-delego sessions prune  --profile coder [--keep N] [--older-than <duration>]
-delego sessions export --profile coder --id 20260525-091247-abc123 --to <path>
-```
-
-Each session is one JSONL file. Every line is a normalized `DelegoEvent`. The latest session is the newest completed or interrupted session for the same profile, ordered by the timestamp prefix in the session id. FTS5 indexes are derived data and may be rebuilt from JSONL files.
+Session capture, listing, search, export, prune, and unified resume are deferred. v1 relies entirely on each backend's native session storage; use the backend's own tooling to inspect or replay past runs.
 
 ### 6.6 Diagnostics
 
 ```bash
-delego doctor                                             # check backend installs, MCP servers, credentials
 delego version
 delego --help
 ```
 
+A dedicated `delego doctor` (backend / MCP / hook script / `userConfig` checks) is deferred — see [TODOs](#10-roadmap).
+
 ---
 
-## 7. Multi-Agent Composition
+## 7. Multi-Agent Composition (v1)
 
-### v1 (programmatic + pipe)
+v1 supports multi-agent flows only through shell composition. Sub-agent invocation via an auto-injected Delego MCP server (`delegate_<peer>`) is deferred (§3.4, §10).
 
 ```bash
 # Pipe (linear, text)
-delego run --profile extractor --task "extract requirements from spec.md" \
-  | delego run --profile designer --task "design API given these requirements" \
-  | delego run --profile coder --task "implement the API"
+delego run --agent extractor --task "extract requirements from spec.md" \
+  | delego run --agent designer --task "design API given these requirements" \
+  | delego run --agent coder    --task "implement the API"
 
 # Programmatic (structured)
-PLAN=$(delego run --profile planner --task "$1" --output json)
-delego run --profile coder --task "$(echo $PLAN | jq -r .step1)"
-delego run --profile tester --task "$(echo $PLAN | jq -r .step2)"
+PLAN=$(delego run --agent planner --task "$1" --output json)
+delego run --agent coder  --task "$(echo $PLAN | jq -r .step1)"
+delego run --agent tester --task "$(echo $PLAN | jq -r .step2)"
 ```
-
-### v2 (sub-agent via auto-injected MCP)
-
-When agent `coder` runs, its `delego` MCP server exposes `delegate_writer`, `delegate_reviewer`, ... — one tool per other registered agent. The coder agent itself decides when to invoke them inside its own loop.
-
-```
-delego run --profile orchestrator --task "implement and test the auth feature"
-  └─ orchestrator's LLM, seeing delegate_coder and delegate_tester in its toolbox, autonomously:
-       1. delegate_coder(task="write the auth handler")
-       2. delegate_tester(task="write integration tests")
-```
-
-The MCP `delegate_<peer>` tool internally calls `delego run --profile <peer> --task ... --output json` and returns the parsed result. Sub-runs get their own session id and logs. Depth limit and circular-call protection enforced in `packages/mcp-server/`.
 
 ---
 
@@ -416,12 +392,11 @@ delego/
 │   ├── cli/                          # @delego/cli — the only v1 app
 │   │   ├── src/
 │   │   │   ├── main.ts               # citty entry
-│   │   │   └── commands/             # one file per command group
-│   │   │       ├── agent.ts          # agent {create,list,show,delete,...}
-│   │   │       ├── skill.ts
+│   │   │   └── commands/
+│   │   │       ├── agent.ts          # agent {create,list,show,delete,rename}
+│   │   │       ├── skills.ts         # skills {add,list,show,update,remove}
 │   │   │       ├── run.ts
-│   │   │       ├── chat.ts
-│   │   │       └── sessions.ts
+│   │   │       └── chat.ts
 │   │   └── package.json
 │   ├── desktop/                      # placeholder (empty)
 │   ├── web/                          # placeholder (empty)
@@ -429,39 +404,26 @@ delego/
 ├── packages/
 │   ├── types/                        # @delego/types — lingua franca
 │   │   └── src/
-│   │       ├── profile.ts            # Profile, RuntimeConfig, DefaultsConfig, ...
+│   │       ├── profile.ts            # Profile, RuntimeConfig, DefaultsConfig
 │   │       ├── context.ts            # AgentContext
-│   │       ├── events.ts             # DelegoEvent (normalized stream)
 │   │       ├── backend.ts            # Backend interface + Capabilities
 │   │       └── index.ts
 │   ├── core/                         # @delego/core
 │   │   └── src/
 │   │       ├── profile/              # TOML read/write/validate
 │   │       ├── context/              # AgentContext builder
-│   │       ├── secrets/              # launch env + credential helpers
-│   │       ├── launcher/             # spawns backend, manages lifecycle, streams events
-│   │       ├── sessions/             # jsonl writer + sqlite FTS5 index
-│   │       ├── hooks/                # hook runner
-│   │       └── prompt/               # render system prompt
-│   ├── mcp-server/                   # @delego/mcp-server (the delego MCP server)
-│   │   └── src/
-│   │       ├── server.ts             # MCP server bootstrap (stdio)
-│   │       ├── tools/
-│   │       │   └── delegate.ts       # delegate_<peer> generator
-│   │       └── modes/
-│   │           ├── embedded.ts       # in-process per-run mode
-│   │           └── standalone.ts     # long-lived MCP server mode for host integrations
+│   │       ├── secrets/              # launch env helpers
+│   │       ├── launcher/             # spawns backend, passes stdio through
+│   │       └── prompt/               # render soul prompt
 │   ├── skills/                       # @delego/skills
 │   │   └── src/
 │   │       ├── source-parser.ts      # local / git / GitHub / GitLab / well-known sources
-│   │       ├── discover.ts           # SKILL.md discovery + multi-skill selection candidates
+│   │       ├── discover.ts           # SKILL.md discovery + multi-skill selection
 │   │       ├── vendor.ts             # direct copy + write manifest
 │   │       ├── manifest.ts           # .delego-skill.json
 │   │       └── update.ts             # diff + conflict detection
 │   ├── backend-base/                 # @delego/backend-base — interface + shared helpers
-│   │   └── src/
-│   │       ├── backend.ts            # re-export Backend type
-│   │       └── stream-parser.ts      # generic stream-json -> DelegoEvent
+│   │   └── src/backend.ts
 │   ├── backend-claude-code/
 │   └── backend-copilot-cli/
 ├── docs/
@@ -472,29 +434,20 @@ delego/
 └── tsconfig.base.json
 ```
 
+A `packages/mcp-server/` for the deferred Delego MCP server (§3.4) will be added when sub-agent invocation lands.
+
 ---
 
 ## 9. Distribution
 
-### 9.1 Developer install (Bun users)
+v1 ships exclusively as an npm-published package consumed via the Bun toolchain:
 
 ```bash
 bun install -g @delego/cli
 delego --help
 ```
 
-### 9.2 End-user install (compiled binary)
-
-`bun build --compile --target=bun-darwin-arm64 --outfile dist/delego-macos-arm64`
-(plus linux-x64, linux-arm64, win-x64 in CI)
-
-Published via GitHub Releases. Future: Homebrew tap, Scoop bucket, AUR.
-
-### 9.3 Docker
-
-`docker run -v $HOME/.delego:/root/.delego ghcr.io/<org>/delego run --profile coder --task "..."`
-
-(for CI / serverless invocations; deferred to post-v1)
+Compiled binaries, OS package managers, and container images are deferred — see [TODOs](#10-roadmap).
 
 ---
 
@@ -502,23 +455,31 @@ Published via GitHub Releases. Future: Homebrew tap, Scoop bucket, AUR.
 
 | Milestone | Scope | Acceptance |
 |---|---|---|
-| **M1 — walking skeleton** | Monorepo bootstrapped. `delego --help` prints. `delego version` works. `delego agent create/list/show` works on disk (no backend integration). | `bun run delego agent create foo && bun run delego agent list` round-trips. |
-| **M2 — single backend** | Claude-code adapter only. `delego run` end-to-end (one-shot + stream). Session jsonl written. | `delego run --profile foo --task "say hi"` returns assistant text. `delego sessions show --profile foo --id <id>` shows transcript. |
-| **M3 — plugin root + MCP foundation** | Agent plugin root loads `skills/`, `settings.json`, `hooks/`, `.mcp.json`, and `bin/`. Skill add/list/update works for local, git, GitHub/GitLab, and well-known sources. | Agent can install from a source containing multiple skills by selecting skills interactively; manually edited per-agent MCP config loads during runs. |
-| **M4 — backend parity** | Claude Code and Copilot CLI adapters. Permission abstraction mapping. `--runtime` flag works. | Same agent profile runs through both v1 backends (modulo backend feature flags). |
-| **M5 — multi-agent (v2)** | `delegate_<peer>` tools auto-injected. Depth/cycle protection. Standalone MCP server mode for IDE/external integrations. | An "orchestrator" agent successfully invokes "coder" and "tester" sub-agents within one run. |
-| **M6 — polish** | Compiled binary releases. Hooks. Resume across backends. `delego doctor`. FTS5 session search. | End-user `brew install delego` works on macOS. |
+| **M1 — walking skeleton** | Monorepo bootstrapped. `delego --help` / `delego version` work. `delego agent create/list/show/delete/rename` round-trip on disk. | `bun run delego agent create foo && bun run delego agent list` round-trips. |
+| **M2 — single backend** | Claude-code adapter only. `delego run` and `delego chat` work end-to-end; backend stdout/stderr passes through unchanged. Soul prompt injected as append-system-prompt; agent directory loaded via `--plugin-dir`. | `delego run --agent foo --task "say hi"` returns assistant text. `--runtime-flag --continue` resumes the backend's native session. |
+| **M3 — plugin ecosystem** | `skills add/list/show/update/remove` for local, git, GitHub/GitLab, and well-known sources, with `--ref` pinning and interactive multi-select. Hand-edited `.mcp.json` and `hooks/hooks.json` load through the plugin during runs. | A `skills add` from a multi-skill source installs the user-selected subset; a hand-written hook fires during `delego run`. |
+| **M4 — backend parity** | Copilot CLI adapter. Permission abstraction mapping across both backends. `--runtime` flag works. | The same agent profile runs through both v1 backends (modulo declared capability gaps). |
+| **M5 — polish** | Bug-fix pass, docs, examples, error-message quality, npm publish pipeline. | `bun install -g @delego/cli` from a clean machine yields a working `delego` end-to-end. |
 
-v3 (workflow DSL, desktop/web/gateway) explicitly out of scope.
+### TODOs (post-v1, intentionally deferred)
+
+- **Session layer.** Unified session capture, listing, search, export, prune, and cross-backend resume. v1 uses backend-native sessions only.
+- **Agent-to-agent invocation.** In-process Delego MCP server, `delegate_<peer>` tool generation, depth and cycle protection via `DELEGO_RUN_CHAIN`, standalone MCP server mode for IDE / external hosts.
+- **`delego doctor`.** Static checks for backend binaries / versions, `.mcp.json` validity, hook script executability, `userConfig` wiring, `bin/` shadowing of system commands, and `claude plugin validate` integration.
+- **Standalone distribution.** Compiled single-file binaries via `bun build --compile` for macOS / Linux / Windows; Homebrew tap, Scoop bucket, AUR; Docker images for CI / serverless.
+- **Codex and Gemini adapters.**
+- **Workflow DSL.**
+- **Desktop / web / gateway surfaces.**
 
 ---
 
 ## 11. Open Risks
 
-1. **Backend stability** — claude-code and copilot-cli change their CLI surface over time. Adapter packages will need active maintenance. Each adapter pins minimum required version and probes capabilities at startup.
-2. **MCP `delegate_<peer>` recursion** — without protection, agent A can spawn agent B which spawns agent A again, indefinitely. Mitigation: `max_spawn_depth` (default 3), cycle detection via run-id chain.
-3. **Skill update conflicts** — `.delego-skill.json` checksum diverging from current files indicates local edits. We refuse, require explicit `--force` or `detach`. Acceptable UX cost.
-4. **Secret availability** — MCP servers may require credentials in the launch environment. `delego doctor` should detect missing required env vars where possible, but backend-native secret handling can still fail at runtime.
+1. **Backend stability.** claude-code and copilot-cli change their CLI surface over time. Adapter packages will need active maintenance. Each adapter pins minimum required version and probes capabilities at startup.
+2. **Claude Code plugin spec drift.** The plugin layout and `${CLAUDE_PLUGIN_*}` substitution variables may evolve. Because Delego does not author plugin files itself (manifest, hooks, MCP config are all hand-authored or vendored), the blast radius is limited to documentation and adapter capability flags.
+3. **Skill update conflicts.** `.delego-skill.json` checksum diverging from current files indicates local edits. We refuse, require explicit `--force` or `detach`. Acceptable UX cost.
+4. **Secret availability.** MCP servers may require credentials via `userConfig` or environment. Until `delego doctor` lands, missing credentials surface only as backend-side runtime errors.
+5. **`bin/` namespace collisions.** Plugin executables become bare commands in the backend's Bash tool and can shadow system commands. Recommend naming `bin/` entries with an agent-specific prefix.
 
 ---
 
@@ -529,22 +490,16 @@ v3 (workflow DSL, desktop/web/gateway) explicitly out of scope.
 | 1 | Strict noun-verb CLI grammar; agent management may use positional names, other values use options | §6 |
 | 2 | Global-only agent storage (`~/.delego/agents/`) | §4 |
 | 3 | Orchestrator mode (no own runtime), pluggable backends | §3.3 |
-| 4 | TOML profile + standalone soul.md | §5.1 |
-| 5 | `.mcp.json` is per-agent and follows the Claude Code project MCP config shape | §4, §5.2 |
-| 6 | Reserved internal MCP server/tool names fail fast on conflict | §5.2 |
-| 7 | v1=programmatic+pipe; v2=sub-agent via MCP; no v3 workflow | §7 |
-| 8 | MCP topology: single `delego` server, instantiated per-run | §3.4 |
-| 9 | `delegate_<peer>` granularity (one tool per peer) | §3.4, §7 |
-| 10 | `AgentContext` is the pipeline center; CLI overrides act on it | §3.2 |
-| 11 | Skills: direct-copy installed directories are the source of truth; source parsing follows SKILL.md discovery with interactive multi-select | §5.4, §6.2 |
-| 12 | Plugin root: `skills/`, `settings.json`, `hooks/`, `.mcp.json`, `bin/` | §4 |
-| 13 | Secrets: launch env or backend-native secret handling; never plaintext config files | §4, §5.2 |
-| 14 | Three run modes: run / run --stream / chat; `--continue` resumes latest | §6.4 |
-| 15 | Output formats: text / json / stream-json | §6.4 |
-| 16 | Unified jsonl session log, rebuildable FTS5 index, best-effort cross-backend resume | §6.5, §4 |
-| 17 | Permission: abstract (ask/auto/yolo) + raw escape hatch | §6.4, §5.1 |
-| 18 | Hooks live in plugin-root `settings.json` using existing Claude Code hook settings format | §5.3, §6.3 |
-| 19 | TypeScript + Bun + Turborepo + citty | §8 |
-| 20 | Agent names are lowercase kebab-case; delegate tool names are derived collision-free | §3.2, §3.4 |
-| 21 | Claude Code and Copilot CLI load the agent directory directly via `--plugin-dir` | §3.3 |
-| 22 | No `config` command in v1 | §2, §6.6 |
+| 4 | TOML profile + standalone `soul.md` (passed as append-system-prompt) | §5.1 |
+| 5 | Agent directory IS a Claude Code plugin; layout, manifest, hooks, MCP servers all follow the Claude Code plugin spec | §4, §5 |
+| 6 | v1 ships shell-pipe composition only; sub-agent invocation deferred | §3.4, §7, §10 |
+| 7 | v1 has no session layer; native backend sessions only; `sessions` subcommands deferred | §2, §6.5, §10 |
+| 8 | `AgentContext` is the pipeline center; CLI overrides act on it | §3.2 |
+| 9 | Skills: direct-copy installed directories are the source of truth; source parsing follows SKILL.md discovery with interactive multi-select; installs support `--ref` pinning | §5.4, §6.2 |
+| 10 | Secrets via Claude Code `userConfig` or launch env; never plaintext config files | §4, §5.2 |
+| 11 | Permission: abstract (ask / auto / yolo) + `--runtime-flag` raw escape hatch | §6.4, §5.1 |
+| 12 | Hooks live in `hooks/hooks.json` per Claude Code plugin spec; scripts in `scripts/` referenced via `${CLAUDE_PLUGIN_ROOT}` | §5.3, §6.3 |
+| 13 | TypeScript + Bun + Turborepo + citty | §8 |
+| 14 | Agent names are lowercase kebab-case; agent-scoped CLI option is `-a, --agent` | §3.2, §6 |
+| 15 | Resume uses backend-native flags via `--runtime-flag`; unified resume is a TODO | §6.4, §10 |
+| 16 | No `config` command in v1 | §2, §6.6 |
