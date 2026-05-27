@@ -34,7 +34,7 @@ export class ClaudeCodeBackend implements Backend {
   private readonly binary: string;
 
   constructor(binary?: string) {
-    this.binary = binary ?? process.env['DELEGO_CLAUDE_BIN'] ?? 'claude';
+    this.binary = binary ?? process.env['KMAN_CLAUDE_BIN'] ?? 'claude';
   }
 
   mapPermission(level: PermissionLevel): string {

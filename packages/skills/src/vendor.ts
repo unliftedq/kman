@@ -23,7 +23,7 @@ export interface VendorResult {
 
 /**
  * Copy a discovered SKILL.md directory into <agent>/skills/<installName>/
- * and write the .delego-skill.json manifest (§5.4).
+ * and write the .kman-skill.json manifest (§5.4).
  */
 export async function vendorSkill(opts: VendorOptions): Promise<VendorResult> {
   const name = opts.installName ?? opts.skill.name;

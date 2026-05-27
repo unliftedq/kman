@@ -1,6 +1,6 @@
 # kman
 
-Multi-agent orchestration engine, *inspired by [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)* — a small society of named, well-tailored agents you can dispatch on a mission. See [docs/DESIGN.md](docs/DESIGN.md) for the architecture (the design doc still uses the project's working name "delego" internally; only the published CLI and binary are branded `kman`).
+Multi-agent orchestration engine, *inspired by [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)* — a small society of named, well-tailored agents you can dispatch on a mission. See [docs/DESIGN.md](docs/DESIGN.md) for the architecture.
 
 ## Layout
 

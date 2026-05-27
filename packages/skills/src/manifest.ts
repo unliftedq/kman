@@ -11,7 +11,7 @@ export interface SkillManifest {
   checksum?: string;
 }
 
-export const MANIFEST_FILENAME = '.delego-skill.json';
+export const MANIFEST_FILENAME = '.kman-skill.json';
 
 export function manifestPath(skillDir: string): string {
   return join(skillDir, MANIFEST_FILENAME);

@@ -57,7 +57,7 @@ async function cloneGit(
   ref: string | undefined,
   subpath: string | undefined,
 ): Promise<MaterializedSource> {
-  const dir = await mkdtemp(join(tmpdir(), 'delego-skill-'));
+  const dir = await mkdtemp(join(tmpdir(), 'kman-skill-'));
   // Shallow clone first; if a ref is provided, fetch + checkout it (works for branch/tag/sha).
   await runGit(['clone', '--depth', '1', url, dir]);
   if (ref) {

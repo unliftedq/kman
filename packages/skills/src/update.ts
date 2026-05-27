@@ -29,7 +29,7 @@ export async function updateSkill(opts: UpdateOptions): Promise<{ installedPath:
   const manifest = await readManifest(dir);
   if (!manifest) {
     throw new UserError(
-      `Skill "${opts.skill}" has no .delego-skill.json manifest; cannot update. Use "skills remove" then "skills add".`,
+      `Skill "${opts.skill}" has no .kman-skill.json manifest; cannot update. Use "skills remove" then "skills add".`,
     );
   }
 
@@ -83,7 +83,7 @@ async function newestMtime(dir: string): Promise<Date | null> {
         stack.push(p);
         continue;
       }
-      if (e.name === '.delego-skill.json') continue;
+      if (e.name === '.kman-skill.json') continue;
       try {
         const s = await stat(p);
         if (!newest || s.mtime > newest) newest = s.mtime;

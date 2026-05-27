@@ -18,7 +18,7 @@ export function buildAgentCommand(): Command {
 
   cmd
     .command('create <name>')
-    .description('Create a new agent (~/.delego/agents/<name>/).')
+    .description('Create a new agent (~/.kman/agents/<name>/).')
     .option('--runtime <backend>', 'Default backend (claude-code | copilot-cli).')
     .option('--model <id>', 'Default model id.')
     .option('--description <text>', 'Free-form description.')

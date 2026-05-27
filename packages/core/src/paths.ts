@@ -1,14 +1,14 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-/** Root of Delego's per-user state (§4). */
-export function delegoHome(): string {
-  const override = process.env['DELEGO_HOME'];
-  return override && override.length > 0 ? override : join(homedir(), '.delego');
+/** Root of kman's per-user state (§4). */
+export function kmanHome(): string {
+  const override = process.env['KMAN_HOME'];
+  return override && override.length > 0 ? override : join(homedir(), '.kman');
 }
 
 export function agentsRoot(): string {
-  return join(delegoHome(), 'agents');
+  return join(kmanHome(), 'agents');
 }
 
 export function agentDir(name: string): string {

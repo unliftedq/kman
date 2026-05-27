@@ -11,7 +11,7 @@ import type {
 export interface AgentContext {
   /** Resolved agent profile, untouched (profile stays immutable on disk). */
   readonly profile: Profile;
-  /** Absolute path to the agent directory (~/.delego/agents/<name>). */
+  /** Absolute path to the agent directory (~/.kman/agents/<name>). */
   readonly agentDir: string;
   /** Rendered soul prompt content (the file body, not the path). */
   readonly soulPrompt: string;

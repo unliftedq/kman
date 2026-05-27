@@ -8,7 +8,7 @@ export interface ExtractResult {
 /**
  * Pull `-a <name>` / `--agent <name>` / `--agent=<name>` out of argv so it
  * can be placed before *or* after the subcommand. Multiple occurrences error
- * out per §6 ("If --agent appears more than once, Delego exits with code 2").
+ * out per §6 ("If --agent appears more than once, kman exits with code 2").
  */
 export function extractAgentOption(argv: string[]): ExtractResult {
   const rest: string[] = [];
@@ -47,7 +47,7 @@ function assertSingle(current: string | undefined): void {
 }
 
 export function requireAgent(): string {
-  const a = process.env['DELEGO_SELECTED_AGENT'];
+  const a = process.env['KMAN_SELECTED_AGENT'];
   if (!a) {
     throw new UserError('Missing required --agent <name>. Agent-scoped commands need a target agent.');
   }
@@ -55,11 +55,11 @@ export function requireAgent(): string {
 }
 
 export function optionalAgent(): string | undefined {
-  return process.env['DELEGO_SELECTED_AGENT'] || undefined;
+  return process.env['KMAN_SELECTED_AGENT'] || undefined;
 }
 
 export function rejectAgent(commandName: string): void {
-  if (process.env['DELEGO_SELECTED_AGENT']) {
+  if (process.env['KMAN_SELECTED_AGENT']) {
     throw new UserError(`Subcommand "${commandName}" does not accept --agent.`);
   }
 }

@@ -34,7 +34,7 @@ export class CopilotCliBackend implements Backend {
   private readonly binary: string;
 
   constructor(binary?: string) {
-    this.binary = binary ?? process.env['DELEGO_COPILOT_BIN'] ?? 'copilot';
+    this.binary = binary ?? process.env['KMAN_COPILOT_BIN'] ?? 'copilot';
   }
 
   mapPermission(level: PermissionLevel): string {

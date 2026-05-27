@@ -5,7 +5,7 @@ import type { PermissionLevel } from './profile.js';
 export interface BackendCapabilities {
   /** Can load the agent directory as a Claude Code plugin via --plugin-dir. */
   supportClaudeCodePlugin: boolean;
-  /** Can accept Delego's rendered soul as an additional system prompt. */
+  /** Can accept kman's rendered soul as an additional system prompt. */
   supportsAppendSystemPrompt: boolean;
   /** Exposes a native --resume / --continue style flag. */
   supportsNativeResume: boolean;

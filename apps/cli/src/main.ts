@@ -1,5 +1,5 @@
 import { Command, CommanderError } from 'commander';
-import { DelegoError, ExitCode } from '@kman/types';
+import { KmanError, ExitCode } from '@kman/types';
 import { buildAgentCommand } from './commands/agent.js';
 import { buildSkillsCommand } from './commands/skills.js';
 import { buildRunCommand } from './commands/run.js';
@@ -8,7 +8,7 @@ import { buildVersionCommand } from './commands/version.js';
 import { extractAgentOption } from './common/agent-option.js';
 
 function die(err: unknown): never {
-  if (err instanceof DelegoError) {
+  if (err instanceof KmanError) {
     if (err.message) process.stderr.write(`kman: ${err.message}\n`);
     process.exit(err.code);
   }
@@ -20,7 +20,7 @@ function die(err: unknown): never {
   }
   const message = err instanceof Error ? err.message : String(err);
   process.stderr.write(`kman: unexpected error: ${message}\n`);
-  if (process.env['DELEGO_DEBUG'] && err instanceof Error && err.stack) {
+  if (process.env['KMAN_DEBUG'] && err instanceof Error && err.stack) {
     process.stderr.write(err.stack + '\n');
   }
   process.exit(ExitCode.AgentError);
@@ -50,7 +50,7 @@ let rawArgs: string[];
 try {
   const argv = process.argv.slice(2);
   const { rest, agent } = extractAgentOption(argv);
-  if (agent !== undefined) process.env['DELEGO_SELECTED_AGENT'] = agent;
+  if (agent !== undefined) process.env['KMAN_SELECTED_AGENT'] = agent;
   rawArgs = rest;
 } catch (err) {
   die(err);
