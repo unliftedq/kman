@@ -45,6 +45,7 @@
     "start": "bun run ./src/main.ts",
     "build": "bun run ./scripts/build.ts",
     "typecheck": "tsc -b",
+    "test": "bun test",
     "clean": "rm -rf dist .tsbuild .turbo *.tsbuildinfo",
     "prepublishOnly": "bun run build"
   },

@@ -44,7 +44,7 @@ interface VersionResult {
  */
 export async function probeBinaryVersion(
   bin: string,
-  timeoutMs = 5000,
+  timeoutMs = 15000,
 ): Promise<VersionResult> {
   return new Promise<VersionResult>((resolve) => {
     let stdout = '';
