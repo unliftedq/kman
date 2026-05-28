@@ -18,7 +18,10 @@ function die(err: unknown): never {
   // commander throws CommanderError for usage / unknown-command / missing-arg.
   if (err instanceof CommanderError) {
     // commander already prints to stderr for these. Map common ones to our exit codes.
-    const code = err.code === 'commander.help' || err.code === 'commander.helpDisplayed' ? 0 : ExitCode.UserError;
+    const code =
+      err.code === 'commander.help' || err.code === 'commander.helpDisplayed' || err.code === 'commander.version'
+        ? 0
+        : ExitCode.UserError;
     process.exit(code);
   }
   const message = err instanceof Error ? err.message : String(err);
