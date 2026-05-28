@@ -12,7 +12,7 @@ import { optionalAgent } from '../common/agent-option.js';
 export function buildDoctorCommand(): Command {
   return new Command('doctor')
     .description(
-      'Diagnose environment + agent configuration (backend binaries, .mcp.json, hooks, bin/, skills).',
+      'Diagnose the environment and (optionally) an agent: runtime binaries, .mcp.json, hooks, bin/, skills.',
     )
     .option('--json', 'Emit the report as JSON to stdout.')
     .option('-v, --verbose', 'Show detail / hint lines for ok checks too.')

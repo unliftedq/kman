@@ -18,11 +18,17 @@ export function buildAgentCommand(): Command {
 
   cmd
     .command('create <name>')
-    .description('Create a new agent (~/.kman/agents/<name>/).')
-    .option('--runtime <backend>', 'Default backend (claude-code | copilot-cli).')
+    .description('Create a new agent at ~/.kman/agents/<name>/.')
+    .option('--runtime <runtime>', 'Default agent runtime (claude-code | copilot-cli).')
     .option('--model <id>', 'Default model id.')
-    .option('--description <text>', 'Free-form description.')
-    .option('--soul <text>', 'Initial soul prompt content.')
+    .option(
+      '--description <text>',
+      "What the agent is for or specializes in — a short label, e.g. \"C# code review\".",
+    )
+    .option(
+      '--soul <text>',
+      'Initial soul prompt body — how the agent thinks and behaves. Written to soul.md.',
+    )
     .action(async (name: string, opts: { runtime?: string; model?: string; description?: string; soul?: string }) => {
       validateAgentName(name);
 
@@ -115,7 +121,7 @@ export function buildAgentCommand(): Command {
 
   cmd
     .command('show <name>')
-    .description('Show profile + paths for an agent.')
+    .description("Show an agent's profile and on-disk paths.")
     .action(async (name: string) => {
       const profile = await readProfile(name);
       process.stdout.write(`name:        ${profile.name}\n`);
@@ -135,8 +141,8 @@ export function buildAgentCommand(): Command {
 
   cmd
     .command('delete <name>')
-    .description('Delete an agent directory.')
-    .option('--yes', 'Skip confirmation prompt.')
+    .description("Delete an agent's directory and all its contents.")
+    .option('--yes', 'Skip the confirmation prompt.')
     .action(async (name: string, opts: { yes?: boolean }) => {
       validateAgentName(name);
       const dir = agentDir(name);

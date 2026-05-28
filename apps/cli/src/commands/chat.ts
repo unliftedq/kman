@@ -7,12 +7,17 @@ import { parsePermission } from '../common/run-args.js';
 
 export function buildChatCommand(): Command {
   return new Command('chat')
-    .description('Interactive REPL with an agent.')
-    .option('--runtime <backend>', 'Override the agent\'s default backend.')
-    .option('--model <id>', 'Override model id.')
-    .option('--permission <level>', 'ask | auto | yolo')
-    .option('--runtime-flag <flag>', 'Raw backend-native flag (repeatable).', collect, [] as string[])
-    .option('--cwd <path>', 'Working directory for the backend.')
+    .description('Start an interactive session with an agent.')
+    .option('--runtime <runtime>', "Override the agent's default runtime for this session.")
+    .option('--model <id>', "Override the agent's default model for this session.")
+    .option('--permission <level>', 'Permission mode (ask | auto | yolo).')
+    .option(
+      '--runtime-flag <flag>',
+      'Pass a runtime-native flag straight through (repeatable).',
+      collect,
+      [] as string[],
+    )
+    .option('--cwd <path>', 'Working directory for the runtime process.')
     .action(
       async (opts: {
         runtime?: string;

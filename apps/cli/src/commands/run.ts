@@ -7,15 +7,20 @@ import { parseOutputFormat, parsePermission } from '../common/run-args.js';
 
 export function buildRunCommand(): Command {
   return new Command('run')
-    .description('One-shot run of an agent.')
-    .option('--task <text>', 'Task prompt passed to the backend.')
-    .option('--runtime <backend>', 'Override the agent\'s default backend.')
-    .option('--model <id>', 'Override model id.')
-    .option('--permission <level>', 'ask | auto | yolo')
-    .option('--runtime-flag <flag>', 'Raw backend-native flag (repeatable).', collect, [] as string[])
-    .option('--output <format>', 'text | json | stream-json')
-    .option('--stream', 'Implies --output stream-json.')
-    .option('--cwd <path>', 'Working directory for the backend.')
+    .description('Run an agent on a single task non-interactively.')
+    .option('--task <text>', 'Task for the agent to perform.')
+    .option('--runtime <runtime>', "Override the agent's default runtime for this call.")
+    .option('--model <id>', "Override the agent's default model for this call.")
+    .option('--permission <level>', 'Permission mode (ask | auto | yolo).')
+    .option(
+      '--runtime-flag <flag>',
+      'Pass a runtime-native flag straight through (repeatable).',
+      collect,
+      [] as string[],
+    )
+    .option('--output <format>', 'Output format (text | json | stream-json).')
+    .option('--stream', 'Stream incremental output; implies --output stream-json.')
+    .option('--cwd <path>', 'Working directory for the runtime process.')
     .action(
       async (opts: {
         task?: string;
