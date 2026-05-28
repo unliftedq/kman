@@ -22,7 +22,7 @@ Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v
 - **No workflow DSL.** No `kman flow` command, no YAML pipelines. Multi-agent orchestration in v1 is shell composition / pipes only.
 - **No session management.** v1 relies entirely on each backend's native session storage and resume. kman does not capture, normalize, index, or search sessions, and ships no `sessions` subcommands. Cross-backend session UX is a [TODO](#10-roadmap).
 - **No agent-to-agent invocation.** v1 does not run an in-process kman MCP server and does not auto-inject `delegate_<peer>` tools. Sub-agent composition is a [TODO](#10-roadmap).
-- **No `doctor` command.** Environment / backend / plugin diagnostics are deferred. v1 fails fast at run time with actionable errors; a dedicated `kman doctor` is a [TODO](#10-roadmap).
+- **No `doctor` command.** ~~Environment / backend / plugin diagnostics are deferred.~~ As of v1, `kman doctor` ships a minimal version: global backend-binary probes, plus agent-scoped checks for `agent.toml`, `soul`, `.mcp.json` shape, hook script presence/executability, `bin/` shadowing, and installed skills. Deeper integrations (`claude plugin validate`, `userConfig` ↔ env reconciliation) remain a [TODO](#10-roadmap).
 - **No project-local profiles.** All agents live at `~/.kman/`. No `.kman/` in repos.
 - **No skill template system.** New agents start with an empty skills directory.
 - **No shell / HTTP custom tools.** v1 only wires MCP tools through `.mcp.json`. Shell / HTTP tool adapters need a separate schema, timeout, quoting, and safety design.
@@ -360,7 +360,7 @@ kman version
 kman --help
 ```
 
-A dedicated `kman doctor` (backend / MCP / hook script / `userConfig` checks) is deferred — see [TODOs](#10-roadmap).
+A dedicated `kman doctor` (backend / MCP / hook script / `userConfig` checks) ships in v1 with the checks listed in [§10 TODO](#10-roadmap); deeper `userConfig` ↔ env reconciliation remains deferred.
 
 ---
 
@@ -465,7 +465,7 @@ Compiled binaries, OS package managers, and container images are deferred — se
 
 - **Session layer.** Unified session capture, listing, search, export, prune, and cross-backend resume. v1 uses backend-native sessions only.
 - **Agent-to-agent invocation.** In-process kman MCP server, `delegate_<peer>` tool generation, depth and cycle protection via `KMAN_RUN_CHAIN`, standalone MCP server mode for IDE / external hosts.
-- **`kman doctor`.** Static checks for backend binaries / versions, `.mcp.json` validity, hook script executability, `userConfig` wiring, `bin/` shadowing of system commands, and `claude plugin validate` integration.
+- **`kman doctor` deepening.** v1 ships a baseline `doctor` (backend binaries + version, `.mcp.json` JSON validity, hook script presence/executability, `bin/` shadowing warning, agent profile sanity). Deferred extensions: `userConfig` ↔ launch-env reconciliation, deeper `.mcp.json` semantic validation, and `claude plugin validate` integration.
 - **Standalone distribution.** Compiled single-file binaries via `bun build --compile` for macOS / Linux / Windows; Homebrew tap, Scoop bucket, AUR; Docker images for CI / serverless.
 - **Codex and Gemini adapters.**
 - **Workflow DSL.**
