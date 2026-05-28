@@ -355,10 +355,11 @@ async function checkSkills(agent: string): Promise<Check[]> {
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+    const e = err as NodeJS.ErrnoException;
+    if (e.code === 'ENOENT') {
       return [{ id: 'skills.present', label: 'skills/', severity: 'info', message: 'not present.' }];
     }
-    throw err;
+    return [{ id: 'skills.readable', label: 'skills/', severity: 'error', message: e.message }];
   }
   const skills = entries.filter((e) => e.isDirectory()).map((e) => e.name);
   return [
