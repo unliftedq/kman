@@ -1,31 +1,30 @@
 # kman
 
-> 面向多智能体协作的管理工具。名字来自 [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)：不是一个“全能助手”，而是一组各司其职、可按任务派遣的智能体。
+> 面向多 agent 协作的管理工具。名字来自 [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)：不是一个“全能助手”，而是一组各司其职、可按任务派遣的 agent。
 
 [English](README.md)
 
-`kman` 不是模型运行时本身，而是运行时之上的统一调度层。你可以在 Claude Code、GitHub Copilot CLI 等后端之上，维护一组具名智能体（如 `orchestrator`、`developer`、`researcher`），让每个智能体拥有独立目录、独立灵魂提示词（soul prompt）、独立 skills/hooks/MCP 配置，并在需要时精准调用。
+`kman` 不是模型运行时本身，而是运行时之上的统一调度层。你可以在 Claude Code、GitHub Copilot CLI 等后端之上，维护一组具名 agent（如 `orchestrator`、`developer`、`researcher`），让每个 agent 拥有独立目录、独立灵魂提示词（soul prompt）、独立 skills/hooks/MCP 配置，并在需要时精准调用。
 
 想了解设计思路可查看 [docs/DESIGN.md](docs/DESIGN.md)；想直接查看已发布 CLI 说明，可跳转 **[`@unliftedq/kman`](apps/cli/README.md)**。
 
 ## 为什么需要 kman？
 
-随着智能体运行时能力越来越多，若把所有技能、权限和工具都塞进单一配置，维护成本和上下文负担会快速失控。kman 的核心思路是“按智能体隔离”：  
-用多个边界清晰的专用智能体替代一个臃肿的“超级助手”。
+随着 agent 运行时能力越来越多，若把所有技能、权限和工具都塞进单一配置，维护成本和上下文负担会快速失控。kman 的核心思路是“按 agent 隔离”：用多个边界清晰的专用 agent 替代一个臃肿的“超级助手”。
 
 这会带来几个直接收益：
 
-- **上下文更小，成本更低。** 每个智能体只加载自己的目录内容，不必为无关能力消耗上下文与 token。
+- **上下文更小，成本更低。** 每个 agent 只加载自己的目录内容，不必为无关能力消耗上下文与 token。
 - **职责更聚焦。** 通过“一个 soul prompt + 一组精选能力”定义角色，让模型更稳定地执行本职任务。
-- **风险可隔离。** 权限、MCP、hooks 按智能体拆分，问题不会轻易扩散到整套工具链。
-- **后端可切换。** 同一份智能体配置可在不同运行时复用，减少迁移成本。
-- **可版本化、可共享。** 智能体本质上就是目录，天然适合团队协作、审阅和复用。
+- **风险可隔离。** 权限、MCP、hooks 按 agent 拆分，问题不会轻易扩散到整套工具链。
+- **后端可切换。** 同一份 agent 配置可在不同运行时复用，减少迁移成本。
+- **可版本化、可共享。** agent 本质上就是目录，天然适合团队协作、审阅和复用。
 
-一句话：**不要训练一个无所不知的代理；而是组织一支分工明确的代理团队，并用 kman 调度。**
+一句话：**不要训练一个无所不知的 agent；而是组织一支分工明确的 agent 团队，并用 kman 调度。**
 
 ## 工作方式
 
-每个智能体都位于 `~/.kman/agents/<name>/`，包含：
+每个 agent 都位于 `~/.kman/agents/<name>/`，包含：
 
 - `soul.md`：角色与行为约束（系统提示词）
 - `agent.toml`：运行时配置（后端、模型、权限等）
@@ -54,9 +53,9 @@ bun run kman -a coder run --task "Refactor the auth module."
 
 如果你是以 npm 全局安装方式使用，请参考 [`apps/cli/README.md`](apps/cli/README.md)。
 
-## 通过 MCP 做跨智能体调用
+## 通过 MCP 做跨 agent 调用
 
-执行 `kman run` / `kman chat` 时，kman 会自动注入 MCP 服务，使当前智能体可发现并调用其他智能体（如 `kman_list_agents`、`kman_describe_agent`、`kman_run_agent`）。
+执行 `kman run` / `kman chat` 时，kman 会自动注入 MCP 服务，使当前 agent 可发现并调用其他 agent（如 `kman_list_agents`、`kman_describe_agent`、`kman_run_agent`）。
 
 你也可以手动为外部运行时安装：
 
