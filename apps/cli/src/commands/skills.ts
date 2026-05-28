@@ -11,7 +11,7 @@ import {
 } from '@kman/skills';
 import { UserError } from '@kman/types';
 import { requireAgent } from '../common/agent-option.js';
-import { readStdinLine } from '../common/stdin.js';
+import { multiSelectInteractive } from '../common/multiselect.js';
 
 export function buildSkillsCommand(): Command {
   const cmd = new Command('skills').description(
@@ -155,18 +155,9 @@ async function selectSkills(
 }
 
 async function pickInteractive(discovered: DiscoveredSkill[]): Promise<DiscoveredSkill[]> {
-  process.stdout.write('Multiple skills discovered. Enter a comma-separated list of names to install (or "all"):\n');
-  for (const [i, s] of discovered.entries()) {
-    process.stdout.write(`  ${i + 1}. ${s.name}  (${s.relPath})\n`);
-  }
-  process.stdout.write('> ');
-  const answer = (await readStdinLine()).trim();
-  if (answer.toLowerCase() === 'all') return discovered;
-  const wanted = answer.split(',').map((s) => s.trim()).filter(Boolean);
-  const out = discovered.filter((s) => wanted.includes(s.name));
-  if (out.length === 0) {
-    throw new UserError(`No matching skills selected. Wanted: ${wanted.join(', ')}.`);
-  }
-  return out;
+  return multiSelectInteractive<DiscoveredSkill>({
+    message: `Select skills to install (${discovered.length} discovered)`,
+    items: discovered.map((s) => ({ value: s, label: s.name, hint: s.relPath })),
+  });
 }
 
