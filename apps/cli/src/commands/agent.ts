@@ -1,4 +1,4 @@
-import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Command } from 'commander';
 import {
@@ -32,9 +32,11 @@ export function buildAgentCommand(): Command {
       }
 
       await mkdir(dir, { recursive: true });
+      await mkdir(join(dir, 'agents'), { recursive: true });
       await mkdir(join(dir, 'skills'), { recursive: true });
       await mkdir(join(dir, 'hooks'), { recursive: true });
       await mkdir(join(dir, 'scripts'), { recursive: true });
+      await mkdir(join(dir, '.claude-plugin'), { recursive: true });
 
       const profileInit: Parameters<typeof defaultProfile>[1] = {};
       if (opts.description) profileInit.description = opts.description;
@@ -45,9 +47,43 @@ export function buildAgentCommand(): Command {
       const profile = defaultProfile(name, profileInit);
       await writeProfile(profile);
 
-      const soulContent =
+      const soulBody =
         opts.soul ?? `# ${name}\n\nYou are ${name}. Replace this file with your agent's system prompt.\n`;
+      // soul.md doubles as the plugin-contributed agent definition picked up
+      // by both backends via `agents/<name>.md` (symlinked). Plugin loaders
+      // require YAML frontmatter with at least `name:`; `description:` is
+      // optional and only written when the user supplies one — avoids the
+      // ugly `kman agent: <name>` placeholder appearing in three files.
+      const descLine = opts.description ? `description: ${opts.description}\n` : '';
+      const soulContent = `---\nname: ${name}\n${descLine}---\n\n${soulBody}`;
       await writeFile(agentSoulPath(name, profile.soul.prompt_file), soulContent, 'utf8');
+
+      // agents/<name>.md is the file both backends' plugin loaders discover.
+      // We keep soul.md at the root as the canonical source and symlink the
+      // discovered file at it so edits to either stay in sync. On Windows
+      // without Developer Mode / admin, symlink fails — fall back to a static
+      // copy and warn so the user can fix it up.
+      await writeAgentFile(dir, name, soulContent);
+
+      const copilotManifest: Record<string, unknown> = { name, agents: 'agents/' };
+      const claudeManifest: Record<string, unknown> = {
+        name,
+        agents: [`./agents/${name}.md`],
+      };
+      if (opts.description) {
+        copilotManifest['description'] = opts.description;
+        claudeManifest['description'] = opts.description;
+      }
+      await writeFile(
+        join(dir, 'plugin.json'),
+        JSON.stringify(copilotManifest, null, 2) + '\n',
+        'utf8',
+      );
+      await writeFile(
+        join(dir, '.claude-plugin', 'plugin.json'),
+        JSON.stringify(claudeManifest, null, 2) + '\n',
+        'utf8',
+      );
 
       await writeFile(join(dir, '.mcp.json'), JSON.stringify({ mcpServers: {} }, null, 2) + '\n', 'utf8');
 
@@ -139,6 +175,24 @@ export function buildAgentCommand(): Command {
       await rename(src, dst);
       const profile = await readProfile(to);
       await writeProfile({ ...profile, name: to });
+
+      // agents/<from>.md → agents/<to>.md. The symlink target (../soul.md) is
+      // independent of the file's own name, so the link stays valid.
+      const oldAgentMd = join(dst, 'agents', `${from}.md`);
+      const newAgentMd = join(dst, 'agents', `${to}.md`);
+      if (await pathExists(oldAgentMd)) {
+        await rename(oldAgentMd, newAgentMd);
+      }
+
+      // Both plugin manifests embed the agent name; rewrite them in place.
+      await rewriteManifestName(join(dst, 'plugin.json'), to);
+      await rewriteClaudeManifest(join(dst, '.claude-plugin', 'plugin.json'), to);
+
+      // soul.md's frontmatter `name:` is what Claude registers the agent
+      // under (Copilot uses the filename). Drift here means --agent <to>:<to>
+      // fails on Claude. Rewrite the frontmatter so both backends agree.
+      await rewriteSoulFrontmatterName(join(dst, profile.soul.prompt_file), to);
+
       process.stdout.write(`Renamed ${from} → ${to}\n`);
     });
 
@@ -151,6 +205,72 @@ async function pathExists(p: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function rewriteManifestName(path: string, newName: string): Promise<void> {
+  if (!(await pathExists(path))) return;
+  const raw = await readFile(path, 'utf8');
+  const m = JSON.parse(raw) as Record<string, unknown>;
+  m['name'] = newName;
+  await writeFile(path, JSON.stringify(m, null, 2) + '\n', 'utf8');
+}
+
+async function rewriteClaudeManifest(path: string, newName: string): Promise<void> {
+  if (!(await pathExists(path))) return;
+  const raw = await readFile(path, 'utf8');
+  const m = JSON.parse(raw) as Record<string, unknown>;
+  m['name'] = newName;
+  m['agents'] = [`./agents/${newName}.md`];
+  await writeFile(path, JSON.stringify(m, null, 2) + '\n', 'utf8');
+}
+
+/**
+ * Replace the `name:` line in soul.md's YAML frontmatter without touching the
+ * body. If no frontmatter is present, prepend a minimal block.
+ */
+async function rewriteSoulFrontmatterName(path: string, newName: string): Promise<void> {
+  if (!(await pathExists(path))) return;
+  const raw = await readFile(path, 'utf8');
+  if (!raw.startsWith('---')) {
+    const prefix = `---\nname: ${newName}\n---\n\n`;
+    await writeFile(path, prefix + raw, 'utf8');
+    return;
+  }
+  const end = raw.indexOf('\n---', 3);
+  if (end < 0) return; // malformed frontmatter — leave untouched.
+  const frontmatter = raw.slice(0, end);
+  const rest = raw.slice(end);
+  const rewritten = frontmatter.replace(/^name:.*$/m, `name: ${newName}`);
+  // If there was no `name:` line, inject one.
+  const withName = /^name:/m.test(rewritten)
+    ? rewritten
+    : rewritten.replace(/^---\n/, `---\nname: ${newName}\n`);
+  await writeFile(path, withName + rest, 'utf8');
+}
+
+/**
+ * Write `agents/<name>.md` as a relative symlink to `../soul.md`. On Windows
+ * machines without symlink permission (no Developer Mode, no admin), the
+ * symlink syscall fails with EPERM — fall back to a static copy so the agent
+ * is still usable, and surface the loss-of-sync to the operator.
+ */
+async function writeAgentFile(dir: string, name: string, soulContent: string): Promise<void> {
+  const target = join(dir, 'agents', `${name}.md`);
+  try {
+    await symlink(join('..', 'soul.md'), target, 'file');
+  } catch (cause) {
+    const err = cause as NodeJS.ErrnoException;
+    if (process.platform === 'win32' && (err.code === 'EPERM' || err.code === 'UNKNOWN')) {
+      await writeFile(target, soulContent, 'utf8');
+      process.stderr.write(
+        `kman: could not create a symlink on Windows (needs Developer Mode or admin); ` +
+          `wrote a static copy at agents/${name}.md instead. Edits to soul.md will not ` +
+          `propagate — keep them in sync manually, or enable Developer Mode and recreate.\n`,
+      );
+      return;
+    }
+    throw cause;
   }
 }
 

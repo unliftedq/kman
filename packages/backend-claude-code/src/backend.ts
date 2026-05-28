@@ -57,10 +57,11 @@ export class ClaudeCodeBackend implements Backend {
     // Plugin directory — load the agent dir as a Claude Code plugin (§4, §3.3).
     args.push('--plugin-dir', ctx.agentDir);
 
-    // Soul prompt as append-system-prompt (§3.2).
-    if (ctx.soulPrompt.trim().length > 0) {
-      args.push('--append-system-prompt', ctx.soulPrompt);
-    }
+    // Soul prompt arrives via the plugin-contributed agent — `<plugin>:<agent>`
+    // is the scoped form Claude resolves at startup. The kman agent name doubles
+    // as both the plugin name (in .claude-plugin/plugin.json) and the agent name
+    // (frontmatter in agents/<name>.md), so we send `<name>:<name>`.
+    args.push('--agent', `${ctx.profile.name}:${ctx.profile.name}`);
 
     // Model override.
     if (ctx.model) {
