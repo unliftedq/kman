@@ -335,7 +335,7 @@ async function checkBinShadowing(agent: string): Promise<Check[]> {
   const stripExt = (n: string) => n.replace(/\.(sh|bat|cmd|exe|ps1)$/i, '');
   const shadowing = files.filter((f) => SHADOWING_DENYLIST.includes(stripExt(f)));
   const out: Check[] = [
-    { id: 'bin.entries', label: 'bin/', severity: 'ok', message: `${files.length} executable(s).` },
+    { id: 'bin.entries', label: 'bin/', severity: 'ok', message: `${files.length} entr${files.length === 1 ? 'y' : 'ies'}.` },
   ];
   if (shadowing.length > 0) {
     out.push({
