@@ -1,12 +1,11 @@
 {
   "name": "@unliftedq/kman",
   "version": "0.0.2",
-  "description": "Multi-agent orchestration engine — a CLI that sits above existing agent CLIs (claude-code, copilot-cli, ...). Inspired by Kingsman.",
+  "description": "Multi-agent management tool — a CLI that manages a roster of named agent profiles on top of existing agent runtimes (claude-code, copilot-cli, ...).",
   "keywords": [
     "agent",
     "agents",
     "multi-agent",
-    "orchestration",
     "claude",
     "claude-code",
     "copilot",

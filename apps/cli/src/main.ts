@@ -31,7 +31,7 @@ function die(err: unknown): never {
 const program = new Command();
 program
   .name('kman')
-  .description('Multi-agent orchestration engine (inspired by Kingsman).')
+  .description('Multi-agent management tool.')
   .version(pkg.version, '-v, --version', 'Print kman CLI version.')
   .helpOption('-h, --help', 'Show help.')
   .showHelpAfterError()

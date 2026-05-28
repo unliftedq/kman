@@ -1,15 +1,15 @@
 # kman — Design Document
 
-> A multi-agent orchestration engine. v1 ships as a CLI; future surfaces (desktop / web / gateway) reuse the same core.
+> A multi-agent management tool. v1 ships as a CLI; future surfaces (desktop / web / gateway) reuse the same core.
 
 ---
 
 ## 1. Vision
 
-kman is **not** another agent runtime. It is an **orchestrator** that sits above existing CLI agents (`claude-code`, `copilot-cli`, and later `codex`, `gemini`, ...) and gives them three things they currently lack as a system:
+kman is **not** another agent runtime. It is an **agent manager** that sits above existing agent runtimes (`claude-code`, `copilot-cli`, and later `codex`, `gemini`, ...) and gives them three things they currently lack as a system:
 
 1. **Named agent profiles** — each agent has its own soul, plugin files, and default runtime, addressable by name.
-2. **Backend-agnostic CLI** — one set of commands, one profile format, regardless of which underlying CLI agent does the work.
+2. **Backend-agnostic CLI** — one set of commands, one profile format, regardless of which underlying runtime does the work.
 3. **Claude Code plugin compatibility** — every kman agent directory is also a valid Claude Code plugin, so skills / hooks / MCP servers / commands written for the broader ecosystem work unchanged.
 
 Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v1 deliberately ships only the CLI.
@@ -19,7 +19,7 @@ Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v
 ## 2. Non-Goals (v1)
 
 - **No own LLM runtime.** kman never calls an LLM API directly. All inference happens inside the chosen backend.
-- **No workflow DSL.** No `kman flow` command, no YAML pipelines. Multi-agent orchestration in v1 is shell composition / pipes only.
+- **No workflow DSL.** No `kman flow` command, no YAML pipelines. Multi-agent composition in v1 is shell pipes only.
 - **No session management.** v1 relies entirely on each backend's native session storage and resume. kman does not capture, normalize, index, or search sessions, and ships no `sessions` subcommands. Cross-backend session UX is a [TODO](#10-roadmap).
 - **No agent-to-agent invocation.** v1 does not run an in-process kman MCP server and does not auto-inject `delegate_<peer>` tools. Sub-agent composition is a [TODO](#10-roadmap).
 - **No `doctor` command.** ~~Environment / backend / plugin diagnostics are deferred.~~ As of v1, `kman doctor` ships a minimal version: global backend-binary probes, plus agent-scoped checks for `agent.toml`, `soul`, `.mcp.json` shape, hook script presence/executability, `bin/` shadowing, and installed skills. Deeper integrations (`claude plugin validate`, `userConfig` ↔ env reconciliation) remain a [TODO](#10-roadmap).
@@ -489,7 +489,7 @@ Compiled binaries, OS package managers, and container images are deferred — se
 |---|---|---|
 | 1 | Strict noun-verb CLI grammar; agent management may use positional names, other values use options | §6 |
 | 2 | Global-only agent storage (`~/.kman/agents/`) | §4 |
-| 3 | Orchestrator mode (no own runtime), pluggable backends | §3.3 |
+| 3 | Manager mode (no own runtime), pluggable backends | §3.3 |
 | 4 | TOML profile + standalone `soul.md` (passed as append-system-prompt) | §5.1 |
 | 5 | Agent directory IS a Claude Code plugin; layout, manifest, hooks, MCP servers all follow the Claude Code plugin spec | §4, §5 |
 | 6 | v1 ships shell-pipe composition only; sub-agent invocation deferred | §3.4, §7, §10 |

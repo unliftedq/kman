@@ -2,7 +2,7 @@
   "name": "kman",
   "private": true,
   "version": "0.0.0",
-  "description": "kman — multi-agent orchestration engine, inspired by Kingsman. Monorepo root.",
+  "description": "kman — multi-agent management tool.",
   "type": "module",
   "workspaces": [
     "apps/*",
