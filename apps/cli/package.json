@@ -52,6 +52,7 @@
     "@kman/backend-claude-code": "workspace:*",
     "@kman/backend-copilot-cli": "workspace:*",
     "@kman/core": "workspace:*",
+    "@kman/mcp-server": "workspace:*",
     "@kman/skills": "workspace:*",
     "@kman/types": "workspace:*",
     "commander": "^14.0.3",

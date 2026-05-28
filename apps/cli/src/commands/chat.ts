@@ -3,6 +3,7 @@ import { buildContext, launchChat, readProfile } from '@kman/core';
 import type { PermissionLevel } from '@kman/types';
 import { requireAgent } from '../common/agent-option.js';
 import { resolveBackend } from '../common/backend-registry.js';
+import { attachKmanMcp } from '../common/mcp-inject.js';
 import { parsePermission } from '../common/run-args.js';
 
 export function buildChatCommand(): Command {
@@ -38,7 +39,8 @@ export function buildChatCommand(): Command {
         });
 
         const backend = resolveBackend(ctx.backend);
-        const { exitCode } = await launchChat(backend, ctx);
+        const launchCtx = await attachKmanMcp(ctx);
+        const { exitCode } = await launchChat(backend, launchCtx);
         process.exit(exitCode);
       },
     );

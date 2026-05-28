@@ -21,7 +21,7 @@ Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v
 - **No own LLM runtime.** kman never calls an LLM API directly. All inference happens inside the chosen backend.
 - **No workflow DSL.** No `kman flow` command, no YAML pipelines. Multi-agent composition in v1 is shell pipes only.
 - **No session management.** v1 relies entirely on each backend's native session storage and resume. kman does not capture, normalize, index, or search sessions, and ships no `sessions` subcommands. Cross-backend session UX is a [TODO](#10-roadmap).
-- **No agent-to-agent invocation.** v1 does not run an in-process kman MCP server and does not auto-inject `delegate_<peer>` tools. Sub-agent composition is a [TODO](#10-roadmap).
+- ~~**No agent-to-agent invocation.**~~ Agent-to-agent invocation now ships as `kman mcp` — a stdio MCP server that exposes the agent roster as MCP tools (`kman_list_agents`, `kman_describe_agent`, `kman_run_agent`) and resources (`kman://agents`, `kman://agents/<name>`). `kman run` and `kman chat` auto-inject the server into the spawned backend; external runtimes register it via `kman mcp install claude-code | copilot-cli`. Cycle and depth protection are handled via the `KMAN_RUN_CHAIN` env var (§3.4).
 - **No `doctor` command.** ~~Environment / backend / plugin diagnostics are deferred.~~ As of v1, `kman doctor` ships a minimal version: global backend-binary probes, plus agent-scoped checks for `agent.toml`, `soul`, `.mcp.json` shape, hook script presence/executability, `bin/` shadowing, and installed skills. Deeper integrations (`claude plugin validate`, `userConfig` ↔ env reconciliation) remain a [TODO](#10-roadmap).
 - **No project-local profiles.** All agents live at `~/.kman/`. No `.kman/` in repos.
 - **No skill template system.** New agents start with an empty skills directory.
@@ -99,17 +99,30 @@ Capability handling is fail-fast for required launch behavior: if a selected bac
 
 For backends with `supportClaudeCodePlugin = true` (claude-code in v1), kman passes the agent directory directly via the backend's `--plugin-dir`. For other backends (copilot-cli, future codex/gemini), the adapter is responsible for translating the relevant subset of the plugin layout (skills, hooks, MCP servers) into the backend's native concepts, or declaring those features unsupported.
 
-### 3.4 Multi-agent invocation (deferred — TODO)
+### 3.4 Multi-agent invocation (via `kman mcp`)
 
-v1 does not ship an in-process kman MCP server, `delegate_<peer>` tools, or any auto-injected delegation mechanism. Composing agents in v1 is done exclusively with shell pipes (§7).
+kman ships a stdio MCP server (`@kman/mcp-server`) exposed through `kman mcp`. The server walks `~/.kman/agents/` at startup and offers three tools and two resource shapes that any MCP host can consume:
 
-The following are explicitly deferred:
+| Surface | Name | Purpose |
+|---|---|---|
+| tool | `kman_list_agents` | Roster of every agent, sans the calling self. |
+| tool | `kman_describe_agent` | `agent.toml` + `soul.md` for one agent. |
+| tool | `kman_run_agent` | Dispatch a task — re-shells `kman -a <name> run --task <task>` as a subprocess. |
+| resource | `kman://agents` | Same roster as a JSON resource. |
+| resource template | `kman://agents/{name}` | Per-agent profile + soul. |
 
-- In-process per-run kman MCP server.
-- One MCP tool per peer agent (`delegate_<peer>`), with depth and cycle protection via a `KMAN_RUN_CHAIN` env var.
-- Standalone long-lived kman MCP server mode for IDE / external host integrations.
+Two distribution paths:
 
-They are intentionally left out until backend stability and session strategy are settled.
+1. **Auto-injection.** `kman run` and `kman chat` materialize a tiny "injection plugin" at `~/.kman/runtime/mcp-injection/` (a `plugin.json` + `.mcp.json` that registers `kman` as an MCP server) and push it into the backend with `--plugin-dir`. The running agent's name flows through the `KMAN_SELF_AGENT` env var, which the MCP server reads to hide the calling agent from its own roster and refuse self-dispatch. Setting `KMAN_NO_MCP=1` opts out per process.
+2. **External runtimes.** `kman mcp install claude-code | copilot-cli` writes a `mcpServers.kman` entry into the runtime's user-scope config. `kman mcp config` prints the JSON snippet for hosts that aren't directly supported.
+
+Cycle and depth protection are carried through `KMAN_RUN_CHAIN` — a comma-separated list of agents in the current delegation stack. The MCP server rejects any dispatch whose target is already in the chain, and refuses to spawn beyond depth 8. The subprocess invariant (each `kman_run_agent` re-shells `kman` rather than running in-process) keeps the MCP server's stdout transport isolated from peer agents' stdio.
+
+Deferred for future work:
+
+- One MCP tool *per peer agent* (`kman_agent_<name>`) instead of a single generic `kman_run_agent`. The generic form is simpler and lets external hosts discover the roster dynamically; per-agent tools may follow once `notifications/tools/list_changed` lands in the server.
+- A long-lived TCP / HTTP transport (vs. the per-spawn stdio transport).
+- Streaming peer output back through `tools/call` progress notifications instead of collecting stdout to completion.
 
 ---
 
@@ -353,7 +366,25 @@ Exit codes:
 
 Session capture, listing, search, export, prune, and unified resume are deferred. v1 relies entirely on each backend's native session storage; use the backend's own tooling to inspect or replay past runs.
 
-### 6.6 Diagnostics
+### 6.6 MCP server
+
+```bash
+# Stdio MCP server — what an external runtime spawns.
+kman mcp [--self <name>] [--self-from-env] [--run-timeout <ms>]
+
+# Register / unregister with an external runtime's user-scope config.
+kman mcp install   claude-code  [--scope user|project] [--force]
+kman mcp install   copilot-cli                          [--force]
+kman mcp uninstall claude-code  [--scope user|project]
+kman mcp uninstall copilot-cli
+
+# Print a paste-ready JSON snippet for hosts that aren't directly supported.
+kman mcp config
+```
+
+Auto-injection during `kman run` / `kman chat` is on by default; set `KMAN_NO_MCP=1` in the parent shell to disable. Override the executable used inside spawned backends with `KMAN_BIN` (defaults: the published `kman` shim, or `node <bundled script>` / `bun <source script>` when running from source).
+
+### 6.7 Diagnostics
 
 ```bash
 kman version
@@ -425,7 +456,16 @@ kman/
 │   ├── backend-base/                 # @kman/backend-base — interface + shared helpers
 │   │   └── src/backend.ts
 │   ├── backend-claude-code/
-│   └── backend-copilot-cli/
+│   ├── backend-copilot-cli/
+│   └── mcp-server/                   # @kman/mcp-server — stdio MCP server + auto-injection plugin
+│       └── src/
+│           ├── server.ts             # JSON-RPC dispatch over stdio
+│           ├── tools.ts              # kman_list_agents / kman_describe_agent / kman_run_agent
+│           ├── resources.ts          # kman://agents and kman://agents/{name}
+│           ├── agents.ts             # roster discovery + per-agent read
+│           ├── runner.ts             # re-shells `kman -a <name> run --task ...`
+│           ├── injection.ts          # materializes ~/.kman/runtime/mcp-injection
+│           └── protocol.ts           # JSON-RPC types + error codes
 ├── docs/
 │   └── DESIGN.md                     # this file
 ├── turbo.json
@@ -434,7 +474,7 @@ kman/
 └── tsconfig.base.json
 ```
 
-A `packages/mcp-server/` for the deferred kman MCP server (§3.4) will be added when sub-agent invocation lands.
+`packages/mcp-server/` ships in v1 — see §3.4 for the surface and §6.6 for the CLI.
 
 ---
 
@@ -464,7 +504,7 @@ Compiled binaries, OS package managers, and container images are deferred — se
 ### TODOs (post-v1, intentionally deferred)
 
 - **Session layer.** Unified session capture, listing, search, export, prune, and cross-backend resume. v1 uses backend-native sessions only.
-- **Agent-to-agent invocation.** In-process kman MCP server, `delegate_<peer>` tool generation, depth and cycle protection via `KMAN_RUN_CHAIN`, standalone MCP server mode for IDE / external hosts.
+- ~~**Agent-to-agent invocation.**~~ Shipped — see §3.4. Generic `kman_run_agent` tool plus `kman mcp install` for external runtime registration; cycle and depth protection via `KMAN_RUN_CHAIN`. Per-agent tool variants (`kman_agent_<name>`) and long-lived HTTP transport remain follow-ups.
 - **`kman doctor` deepening.** v1 ships a baseline `doctor` (backend binaries + version, `.mcp.json` JSON validity, hook script presence/executability, `bin/` shadowing warning, agent profile sanity). Deferred extensions: `userConfig` ↔ launch-env reconciliation, deeper `.mcp.json` semantic validation, and `claude plugin validate` integration.
 - **Standalone distribution.** Compiled single-file binaries via `bun build --compile` for macOS / Linux / Windows; Homebrew tap, Scoop bucket, AUR; Docker images for CI / serverless.
 - **Codex and Gemini adapters.**

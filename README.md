@@ -46,6 +46,18 @@ bun run kman -a coder run --task "Refactor the auth module."
 
 For end-user install via npm, see [`apps/cli/README.md`](apps/cli/README.md).
 
+## Cross-agent dispatch via MCP
+
+Every `kman run` / `kman chat` automatically injects a kman MCP server into the spawned backend, so the running agent can discover and call its peers as MCP tools (`kman_list_agents`, `kman_describe_agent`, `kman_run_agent`). External runtimes can opt in directly:
+
+```bash
+kman mcp install claude-code     # writes user-scope ~/.claude.json
+kman mcp install copilot-cli     # writes user-scope github-copilot/mcp_config.json
+kman mcp config                  # prints the JSON snippet for any other host
+```
+
+Cycle protection (`KMAN_RUN_CHAIN`) prevents `a → b → a` loops; depth is capped at 8. See [docs/DESIGN.md §3.4](docs/DESIGN.md#34-multi-agent-invocation-via-kman-mcp).
+
 ## Layout
 
 ```
@@ -57,7 +69,8 @@ For end-user install via npm, see [`apps/cli/README.md`](apps/cli/README.md).
 │   ├── skills                     # @kman/skills — fetch + vendor SKILL.md sources
 │   ├── backend-base               # @kman/backend-base — spawn helpers
 │   ├── backend-claude-code        # @kman/backend-claude-code
-│   └── backend-copilot-cli        # @kman/backend-copilot-cli
+│   ├── backend-copilot-cli        # @kman/backend-copilot-cli
+│   └── mcp-server                 # @kman/mcp-server — exposes the agent roster as an MCP server
 ├── scripts/                       # one-shot migration helpers
 └── docs/DESIGN.md
 ```

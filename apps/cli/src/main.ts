@@ -7,6 +7,7 @@ import { buildRunCommand } from './commands/run.js';
 import { buildChatCommand } from './commands/chat.js';
 import { buildVersionCommand } from './commands/version.js';
 import { buildDoctorCommand } from './commands/doctor.js';
+import { buildMcpCommand } from './commands/mcp.js';
 import { extractAgentOption } from './common/agent-option.js';
 
 function die(err: unknown): never {
@@ -48,6 +49,7 @@ program.addCommand(buildRunCommand());
 program.addCommand(buildChatCommand());
 program.addCommand(buildVersionCommand());
 program.addCommand(buildDoctorCommand());
+program.addCommand(buildMcpCommand());
 
 let rawArgs: string[];
 try {

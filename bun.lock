@@ -13,14 +13,15 @@
     },
     "apps/cli": {
       "name": "@unliftedq/kman",
-      "version": "0.0.0",
+      "version": "0.0.2",
       "bin": {
-        "kman": "./dist/main.js",
+        "kman": "dist/main.js",
       },
       "devDependencies": {
         "@kman/backend-claude-code": "workspace:*",
         "@kman/backend-copilot-cli": "workspace:*",
         "@kman/core": "workspace:*",
+        "@kman/mcp-server": "workspace:*",
         "@kman/skills": "workspace:*",
         "@kman/types": "workspace:*",
         "commander": "^14.0.3",
@@ -71,6 +72,17 @@
         "typescript": "^5.6.0",
       },
     },
+    "packages/mcp-server": {
+      "name": "@kman/mcp-server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kman/core": "workspace:*",
+        "@kman/types": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.6.0",
+      },
+    },
     "packages/skills": {
       "name": "@kman/skills",
       "version": "0.0.0",
@@ -100,6 +112,8 @@
     "@kman/backend-copilot-cli": ["@kman/backend-copilot-cli@workspace:packages/backend-copilot-cli"],
 
     "@kman/core": ["@kman/core@workspace:packages/core"],
+
+    "@kman/mcp-server": ["@kman/mcp-server@workspace:packages/mcp-server"],
 
     "@kman/skills": ["@kman/skills@workspace:packages/skills"],
 

@@ -3,6 +3,7 @@ import { buildContext, launchRun, readProfile } from '@kman/core';
 import { UserError, type OutputFormat, type PermissionLevel } from '@kman/types';
 import { requireAgent } from '../common/agent-option.js';
 import { resolveBackend } from '../common/backend-registry.js';
+import { attachKmanMcp } from '../common/mcp-inject.js';
 import { parseOutputFormat, parsePermission } from '../common/run-args.js';
 
 export function buildRunCommand(): Command {
@@ -51,7 +52,8 @@ export function buildRunCommand(): Command {
         });
 
         const backend = resolveBackend(ctx.backend);
-        const { exitCode } = await launchRun(backend, ctx);
+        const launchCtx = await attachKmanMcp(ctx);
+        const { exitCode } = await launchRun(backend, launchCtx);
         process.exit(exitCode);
       },
     );
