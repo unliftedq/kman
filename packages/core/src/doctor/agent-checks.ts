@@ -322,10 +322,11 @@ async function checkBinShadowing(agent: string): Promise<Check[]> {
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+    const e = err as NodeJS.ErrnoException;
+    if (e.code === 'ENOENT') {
       return [{ id: 'bin.present', label: 'bin/', severity: 'info', message: 'not present.' }];
     }
-    throw err;
+    return [{ id: 'bin.readable', label: 'bin/', severity: 'error', message: e.message }];
   }
   const files = entries.filter((e) => e.isFile() || e.isSymbolicLink()).map((e) => e.name);
   if (files.length === 0) {
