@@ -1,6 +1,6 @@
 import type { AgentContext, BackendName } from '@kman/types';
 import { ensureInjectionConfig } from '@kman/mcp-server';
-import { mcpServerInvocation } from '../commands/mcp.js';
+import { isKmanInstalledIn, mcpServerInvocation } from '../commands/mcp.js';
 
 /**
  * Make the kman MCP server available inside the agent the user is about to
@@ -23,8 +23,14 @@ export async function attachKmanMcp(ctx: AgentContext): Promise<AgentContext> {
   const flag = mcpConfigFlagFor(ctx.backend);
   if (!flag) return ctx; // unknown backend — fail open rather than block the run
 
-  const inv = mcpServerInvocation();
-  const configPath = await ensureInjectionConfig({ kmanCommand: inv.command, kmanBaseArgs: inv.baseArgs });
+  // If the user already opted in via `kman mcp install`, the backend has
+  // `kman` in its user-scope config. Adding the same key via `--mcp-config`
+  // would re-register it with undefined precedence (host warnings, silent
+  // shadowing, or duplicate-name errors depending on the backend). Skip the
+  // flag entirely in that case — but still write env vars below, because
+  // the installed entry uses the same `${KMAN_SELF_AGENT}` placeholder and
+  // relies on us setting it in the backend's process env.
+  const alreadyInstalled = await isKmanInstalledIn(ctx.backend);
 
   const env: Record<string, string> = {
     ...ctx.env,
@@ -41,6 +47,13 @@ export async function attachKmanMcp(ctx: AgentContext): Promise<AgentContext> {
     // so writing an empty string here overrides the inherited value.
     KMAN_SELECTED_AGENT: '',
   };
+
+  if (alreadyInstalled) {
+    return { ...ctx, env };
+  }
+
+  const inv = mcpServerInvocation();
+  const configPath = await ensureInjectionConfig({ kmanCommand: inv.command, kmanBaseArgs: inv.baseArgs });
 
   return {
     ...ctx,

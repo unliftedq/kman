@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AgentContext } from '@kman/types';
@@ -8,6 +8,8 @@ import { attachKmanMcp } from './mcp-inject.js';
 describe('attachKmanMcp', () => {
   let tmpHome: string;
   let savedKmanHome: string | undefined;
+  let savedHome: string | undefined;
+  let savedUserprofile: string | undefined;
   let savedSelected: string | undefined;
   let savedChain: string | undefined;
   let savedNoMcp: string | undefined;
@@ -15,15 +17,23 @@ describe('attachKmanMcp', () => {
   beforeEach(async () => {
     tmpHome = await mkdtemp(join(tmpdir(), 'kman-attach-test-'));
     savedKmanHome = process.env['KMAN_HOME'];
+    savedHome = process.env['HOME'];
+    savedUserprofile = process.env['USERPROFILE'];
     savedSelected = process.env['KMAN_SELECTED_AGENT'];
     savedChain = process.env['KMAN_RUN_CHAIN'];
     savedNoMcp = process.env['KMAN_NO_MCP'];
     process.env['KMAN_HOME'] = tmpHome;
+    // Redirect homedir() so isKmanInstalledIn() reads our scratch config,
+    // not the real ~/.claude.json on the developer's machine.
+    process.env['HOME'] = tmpHome;
+    process.env['USERPROFILE'] = tmpHome;
     delete process.env['KMAN_NO_MCP'];
   });
 
   afterEach(async () => {
     restore('KMAN_HOME', savedKmanHome);
+    restore('HOME', savedHome);
+    restore('USERPROFILE', savedUserprofile);
     restore('KMAN_SELECTED_AGENT', savedSelected);
     restore('KMAN_RUN_CHAIN', savedChain);
     restore('KMAN_NO_MCP', savedNoMcp);
@@ -67,6 +77,27 @@ describe('attachKmanMcp', () => {
     const ctx = makeCtx('coder', ['--keep'], 'fictional-backend');
     const augmented = await attachKmanMcp(ctx);
     expect(augmented).toBe(ctx);
+  });
+
+  it('skips --mcp-config when `kman` is already installed in ~/.claude.json — but still sets env', async () => {
+    // Reproduces the install-vs-inject collision: if both paths register
+    // `kman`, hosts merge them with undefined precedence. We let the
+    // explicit install win and skip the auto-inject flag, but still set
+    // KMAN_SELF_AGENT so the globally-installed entry's placeholder
+    // resolves correctly at spawn time.
+    await writeFile(
+      join(tmpHome, '.claude.json'),
+      JSON.stringify({ mcpServers: { kman: { command: 'kman', args: ['mcp'] } } }, null, 2),
+      'utf8',
+    );
+
+    const ctx = makeCtx('coder', ['--user-flag'], 'claude-code');
+    const augmented = await attachKmanMcp(ctx);
+
+    expect(augmented.extraArgs).toEqual(['--user-flag']);
+    expect(augmented.env.KMAN_SELF_AGENT).toBe('coder');
+    expect(augmented.env.KMAN_RUN_CHAIN).toBe('coder');
+    expect(augmented.env.KMAN_SELECTED_AGENT).toBe('');
   });
 
   it('initializes KMAN_RUN_CHAIN with the agent name when no chain is set', async () => {

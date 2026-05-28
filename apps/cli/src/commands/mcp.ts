@@ -6,7 +6,64 @@ import { startMcpServer } from '@kman/mcp-server';
 import { UserError } from '@kman/types';
 import pkg from '../../package.json' with { type: 'json' };
 
-const SERVER_KEY = 'kman';
+/**
+ * Canonical key the kman MCP server registers under, both via the install
+ * path and via auto-injection. Anything that touches a host's `mcpServers`
+ * map for kman MUST go through this constant so the two paths never disagree
+ * on the name (and so they detect each other's presence to avoid duplicate
+ * registration).
+ */
+export const SERVER_KEY = 'kman';
+
+/**
+ * The standard `mcpServers.<key>` value kman writes — same shape whether
+ * the user opted in via `kman mcp install` or auto-injection materialized
+ * it. The env block ships the placeholders the per-launch self-exclusion
+ * mechanism needs; hosts that perform `${VAR}` substitution forward them
+ * to the spawned server, and the server tolerates literals as "unset".
+ */
+export function kmanServerEntry(inv: KmanInvocation, extras: { copilotType?: boolean } = {}): Record<string, unknown> {
+  const entry: Record<string, unknown> = {
+    command: inv.command,
+    args: [...inv.baseArgs, 'mcp'],
+    env: {
+      KMAN_SELF_AGENT: '${KMAN_SELF_AGENT}',
+      KMAN_RUN_CHAIN: '${KMAN_RUN_CHAIN}',
+    },
+  };
+  if (extras.copilotType) entry['type'] = 'local';
+  return entry;
+}
+
+/**
+ * Read the user-scope config for a backend and report whether it already
+ * registers the kman MCP server. Used by auto-injection to avoid writing a
+ * second registration for the same key when the user opted in globally —
+ * MCP hosts merge `--mcp-config` additively, and a duplicate key produces
+ * undefined precedence (sometimes warnings, sometimes silent shadowing).
+ *
+ * Returns `false` on any read / parse error: better to inject (and risk a
+ * benign collision the host will warn about) than to silently disable
+ * delegation because we couldn't read a config file we don't own.
+ */
+export async function isKmanInstalledIn(backend: string): Promise<boolean> {
+  let configPath: string;
+  if (backend === 'claude-code' || backend === 'claude') {
+    configPath = claudeUserConfigPath('user');
+  } else if (backend === 'copilot-cli' || backend === 'copilot') {
+    configPath = copilotConfigPath();
+  } else {
+    return false;
+  }
+  try {
+    const parsed = await readJsonOrEmpty(configPath);
+    const servers = parsed['mcpServers'];
+    if (typeof servers !== 'object' || servers === null) return false;
+    return Object.prototype.hasOwnProperty.call(servers, SERVER_KEY);
+  } catch {
+    return false;
+  }
+}
 
 export function buildMcpCommand(): Command {
   const cmd = new Command('mcp').description(
@@ -79,7 +136,7 @@ export function buildMcpCommand(): Command {
       const inv = mcpServerInvocation();
       const snippet = {
         mcpServers: {
-          [SERVER_KEY]: { command: inv.command, args: [...inv.baseArgs, 'mcp'] },
+          [SERVER_KEY]: kmanServerEntry(inv),
         },
       };
       process.stdout.write(JSON.stringify(snippet, null, 2) + '\n');
@@ -146,10 +203,7 @@ async function installClaudeCode(inv: KmanInvocation, scope: 'user' | 'project',
       `Claude Code config already has an MCP server named "${SERVER_KEY}". Re-run with --force to overwrite.`,
     );
   }
-  servers[SERVER_KEY] = {
-    command: inv.command,
-    args: [...inv.baseArgs, 'mcp'],
-  };
+  servers[SERVER_KEY] = kmanServerEntry(inv);
   parsed['mcpServers'] = servers;
   await mkdir(dirname(configPath), { recursive: true });
   await writeFile(configPath, JSON.stringify(parsed, null, 2) + '\n', 'utf8');
@@ -179,11 +233,7 @@ async function installCopilotCli(inv: KmanInvocation, force: boolean): Promise<v
       `Copilot CLI config already has an MCP server named "${SERVER_KEY}". Re-run with --force to overwrite.`,
     );
   }
-  servers[SERVER_KEY] = {
-    type: 'local',
-    command: inv.command,
-    args: [...inv.baseArgs, 'mcp'],
-  };
+  servers[SERVER_KEY] = kmanServerEntry(inv, { copilotType: true });
   parsed['mcpServers'] = servers;
   await mkdir(dirname(configPath), { recursive: true });
   await writeFile(configPath, JSON.stringify(parsed, null, 2) + '\n', 'utf8');
