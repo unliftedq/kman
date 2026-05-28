@@ -1,18 +1,20 @@
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { join } from 'node:path';
 import { kmanHome } from '@kman/core';
 
 /**
- * Path to the synthetic "plugin" we hand to the backend's `--plugin-dir` so
- * the spawned agent picks up the kman MCP server alongside its own plugin.
- *
- * It lives outside `~/.kman/agents/` so it's never mistaken for an agent.
+ * Path to the standalone MCP config the launcher hands to the backend via
+ * its native flag (`--mcp-config` for claude-code, `--additional-mcp-config`
+ * for copilot-cli). One file, no plugin wrapper — so the host registers
+ * the server with its normal namespace (`mcp__kman__<tool>`) instead of the
+ * longer plugin-scoped form.
  */
-export function kmanMcpPluginDir(): string {
-  return join(kmanHome(), 'runtime', 'mcp-injection');
+export function kmanMcpConfigPath(): string {
+  return join(kmanHome(), 'runtime', 'mcp-config.json');
 }
 
-export interface InjectionPluginOptions {
+export interface InjectionConfigOptions {
   /** Command to invoke kman from inside the spawned backend. */
   kmanCommand: string;
   /** Extra args to prepend before `mcp` (e.g. the bundled script path in dev). */
@@ -20,25 +22,22 @@ export interface InjectionPluginOptions {
 }
 
 /**
- * Materialize the injection plugin on disk if it doesn't exist or is out of
- * date. Returns the directory path so the launcher can pass it to the
- * backend via `--plugin-dir`. The directory is reused across runs — the
- * per-agent self-exclusion is delivered via the `KMAN_SELF_AGENT` env var,
- * not by rewriting the plugin every spawn.
+ * Materialize the standalone MCP config on disk if missing or stale. Returns
+ * the file path so the launcher can pass it to the backend's MCP-config flag.
+ * Per-launch self-exclusion is delivered via the `KMAN_SELF_AGENT` env var,
+ * substituted into this config at spawn time — the file itself is shared
+ * across every agent and never needs to be rewritten per launch.
  */
-export async function ensureInjectionPlugin(opts: InjectionPluginOptions): Promise<string> {
-  const dir = kmanMcpPluginDir();
-  await mkdir(dir, { recursive: true });
-  await mkdir(join(dir, '.claude-plugin'), { recursive: true });
+export async function ensureInjectionConfig(opts: InjectionConfigOptions): Promise<string> {
+  const path = kmanMcpConfigPath();
+  await mkdir(dirname(path), { recursive: true });
 
   const args = [...(opts.kmanBaseArgs ?? []), 'mcp', '--self-from-env'];
-  // Most MCP hosts (Claude Code, Copilot CLI) do NOT inherit arbitrary
-  // parent env into spawned MCP servers — they forward only the keys
-  // explicitly listed in this block. Anything the server depends on must
-  // be enumerated here. `${VAR}` substitution happens at spawn time
-  // against the host's own env (claude.exe's env), which the launcher
-  // populates via attachKmanMcp. Unsubstituted literals (`${...}`) are
-  // tolerated by `--self-from-env` and the cycle-chain parser.
+  // `${VAR}` is the standard substitution syntax both supported backends
+  // honor in `mcpServers.<key>.env`. Server-side `--self-from-env` and the
+  // cycle-chain parser both treat unsubstituted literals (`${...}`) as
+  // unset, so the worst-case behavior on a host that skips substitution is
+  // "no self-exclusion" rather than a crash.
   const mcpConfig = {
     mcpServers: {
       kman: {
@@ -52,19 +51,8 @@ export async function ensureInjectionPlugin(opts: InjectionPluginOptions): Promi
     },
   };
 
-  const pluginManifest = {
-    name: 'kman-mcp',
-    description: 'kman-managed peer agents exposed via MCP. Injected automatically by `kman run/chat`.',
-  };
-
-  await writeIfChanged(join(dir, '.mcp.json'), JSON.stringify(mcpConfig, null, 2) + '\n');
-  await writeIfChanged(join(dir, 'plugin.json'), JSON.stringify(pluginManifest, null, 2) + '\n');
-  await writeIfChanged(
-    join(dir, '.claude-plugin', 'plugin.json'),
-    JSON.stringify(pluginManifest, null, 2) + '\n',
-  );
-
-  return dir;
+  await writeIfChanged(path, JSON.stringify(mcpConfig, null, 2) + '\n');
+  return path;
 }
 
 async function writeIfChanged(path: string, contents: string): Promise<void> {

@@ -47,12 +47,79 @@ describe('MCP server', () => {
     await rm(tmpHome, { recursive: true, force: true });
   });
 
-  it('responds to initialize with protocol version and capabilities', async () => {
+  it('responds to initialize with protocol version, capabilities, and usage instructions', async () => {
     const responses = await exchange([{ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }]);
     expect(responses).toHaveLength(1);
     expect(responses[0].result.protocolVersion).toBe('2024-11-05');
     expect(responses[0].result.capabilities.tools).toBeDefined();
+    expect(responses[0].result.capabilities.prompts).toBeDefined();
     expect(responses[0].result.serverInfo.name).toBe('kman');
+    // `instructions` is what hosts inject into the LLM as system-prompt
+    // context — without it the model has no nudge to call kman proactively.
+    expect(typeof responses[0].result.instructions).toBe('string');
+    expect(responses[0].result.instructions).toContain('kman_list_agents');
+    expect(responses[0].result.instructions).toContain('kman_run_agent');
+  });
+
+  it('exposes the workflow prompts via prompts/list', async () => {
+    const responses = await exchange([{ jsonrpc: '2.0', id: 100, method: 'prompts/list', params: {} }]);
+    const names = (responses[0].result.prompts as Array<{ name: string }>).map((p) => p.name);
+    expect(names).toEqual(['list-agents', 'find-agent', 'delegate-task', 'second-opinion']);
+  });
+
+  it('expands the list-agents prompt into roster guidance', async () => {
+    const responses = await exchange([
+      {
+        jsonrpc: '2.0',
+        id: 104,
+        method: 'prompts/get',
+        params: { name: 'list-agents', arguments: {} },
+      },
+    ]);
+    const result = responses[0].result as { messages: Array<{ role: string; content: { text: string } }> };
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]!.role).toBe('user');
+    expect(result.messages[0]!.content.text).toContain('kman_list_agents');
+  });
+
+  it('expands prompts/get into a user-role message with the required args inlined', async () => {
+    const responses = await exchange([
+      {
+        jsonrpc: '2.0',
+        id: 101,
+        method: 'prompts/get',
+        params: { name: 'delegate-task', arguments: { agent: 'planner', task: 'break this down' } },
+      },
+    ]);
+    const result = responses[0].result as { messages: Array<{ role: string; content: { text: string } }> };
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]!.role).toBe('user');
+    expect(result.messages[0]!.content.text).toContain('"planner"');
+    expect(result.messages[0]!.content.text).toContain('break this down');
+  });
+
+  it('rejects prompts/get when a required argument is missing', async () => {
+    const responses = await exchange([
+      {
+        jsonrpc: '2.0',
+        id: 102,
+        method: 'prompts/get',
+        params: { name: 'delegate-task', arguments: { agent: 'planner' } },
+      },
+    ]);
+    expect(responses[0].error.code).toBe(-32602);
+  });
+
+  it('returns method-not-found for an unknown prompt name', async () => {
+    const responses = await exchange([
+      {
+        jsonrpc: '2.0',
+        id: 103,
+        method: 'prompts/get',
+        params: { name: 'no_such_prompt', arguments: {} },
+      },
+    ]);
+    expect(responses[0].error.code).toBe(-32602);
   });
 
   it('lists tools', async () => {

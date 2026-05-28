@@ -1,22 +1,30 @@
-import type { AgentContext } from '@kman/types';
-import { ensureInjectionPlugin } from '@kman/mcp-server';
+import type { AgentContext, BackendName } from '@kman/types';
+import { ensureInjectionConfig } from '@kman/mcp-server';
 import { mcpServerInvocation } from '../commands/mcp.js';
 
 /**
  * Make the kman MCP server available inside the agent the user is about to
- * launch. We add the injection plugin to the backend's `--plugin-dir` list
- * and set `KMAN_SELF_AGENT` so the server hides the calling agent from its
- * own roster (and refuses to dispatch back to it).
+ * launch. Writes a standalone MCP config to ~/.kman/runtime/mcp-config.json
+ * and hands the backend its native MCP-config flag — so the host registers
+ * the server under its plain namespace (`mcp__kman__<surface>`) rather than
+ * a longer plugin-scoped form.
+ *
+ * `KMAN_SELF_AGENT` carries the calling agent's name through so the server
+ * hides it from its own roster and refuses to dispatch back to it; the
+ * placeholder is substituted at spawn time against the env we set here.
  *
  * Opt-out: setting KMAN_NO_MCP=1 returns the context unchanged so users on
  * locked-down systems or running tests aren't forced through the extra
- * plugin load.
+ * config load.
  */
 export async function attachKmanMcp(ctx: AgentContext): Promise<AgentContext> {
   if (process.env['KMAN_NO_MCP'] === '1') return ctx;
 
+  const flag = mcpConfigFlagFor(ctx.backend);
+  if (!flag) return ctx; // unknown backend — fail open rather than block the run
+
   const inv = mcpServerInvocation();
-  const pluginDir = await ensureInjectionPlugin({ kmanCommand: inv.command, kmanBaseArgs: inv.baseArgs });
+  const configPath = await ensureInjectionConfig({ kmanCommand: inv.command, kmanBaseArgs: inv.baseArgs });
 
   const env: Record<string, string> = {
     ...ctx.env,
@@ -36,11 +44,27 @@ export async function attachKmanMcp(ctx: AgentContext): Promise<AgentContext> {
 
   return {
     ...ctx,
-    // The MCP-injection plugin-dir goes *before* user extra args so users
-    // can still pass their own `--plugin-dir <override>` later.
-    extraArgs: ['--plugin-dir', pluginDir, ...ctx.extraArgs],
+    // The MCP-config flag goes *before* user extra args so users can still
+    // override or extend with their own flags downstream.
+    extraArgs: [flag, configPath, ...ctx.extraArgs],
     env,
   };
+}
+
+/**
+ * Map a backend name to the flag it accepts for adding an MCP config
+ * without going through plugin wrapping. Returns undefined for unknown
+ * backends so we skip injection rather than break the launch.
+ */
+function mcpConfigFlagFor(backend: BackendName): string | undefined {
+  switch (backend) {
+    case 'claude-code':
+      return '--mcp-config';
+    case 'copilot-cli':
+      return '--additional-mcp-config';
+    default:
+      return undefined;
+  }
 }
 
 function appendChain(prior: string | undefined, name: string): string {

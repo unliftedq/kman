@@ -29,19 +29,17 @@ export interface ToolHandlerCtx {
 const KMAN_LIST_AGENTS: ToolDef = {
   name: 'kman_list_agents',
   description:
-    'List every agent managed by kman on this machine. Returns one entry per ' +
-    '`~/.kman/agents/<name>/` directory, with the agent name, description, default ' +
-    'runtime, and default model. Use this first to discover what specialist agents ' +
-    'are available before delegating work with `kman_run_agent`.',
+    'List kman-managed specialist agents available on this machine. Use first when a task may ' +
+    'benefit from delegation. Returns each agent\'s name, description, default runtime, and ' +
+    'default model; the local roster may change between conversations.',
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
 };
 
 const KMAN_DESCRIBE_AGENT: ToolDef = {
   name: 'kman_describe_agent',
   description:
-    "Fetch a single agent's profile and soul prompt so the caller can decide " +
-    'whether the agent is the right specialist for a task. Returns the parsed ' +
-    '`agent.toml` plus the contents of `soul.md`.',
+    "Read one agent's full profile and soul prompt. Use after `kman_list_agents` to confirm " +
+    'fit when the roster summary is not enough or multiple agents look relevant.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -55,22 +53,30 @@ const KMAN_DESCRIBE_AGENT: ToolDef = {
 const KMAN_RUN_AGENT: ToolDef = {
   name: 'kman_run_agent',
   description:
-    "Dispatch a task to a kman-managed agent. Runs `kman -a <agent> run --task " +
-    '<task>` as a subprocess and returns the assistant\'s stdout. Use this when ' +
-    'the current agent needs help from a peer specialist — pick the agent name ' +
-    'from `kman_list_agents`. Each call is a fresh one-shot run; sessions are not ' +
-    'preserved across calls.',
+    'Run a one-shot task with a kman-managed peer agent and return its stdout. Use after ' +
+    'choosing an agent from `kman_list_agents`. The task must be self-contained: the peer ' +
+    'receives this text, not your conversation or scratch notes, so include relevant context, ' +
+    'file paths, constraints, and done criteria. Sessions are not shared; self-delegation ' +
+    'and delegation cycles are rejected.',
   inputSchema: {
     type: 'object',
     properties: {
-      agent: { type: 'string', description: 'Target agent (must exist on disk).' },
-      task: { type: 'string', description: 'Task description handed to the peer.' },
+      agent: { type: 'string', description: 'Target agent name from `kman_list_agents`.' },
+      task: {
+        type: 'string',
+        description:
+          'Self-contained task description with the context, paths, constraints, and done criteria needed.',
+      },
       runtime: {
         type: 'string',
-        description: "Override the agent's default runtime (claude-code | copilot-cli).",
+        description: "Optional override for the agent's default runtime (claude-code | copilot-cli).",
       },
-      model: { type: 'string', description: "Override the agent's default model." },
-      permission: { enum: ['ask', 'auto', 'yolo'] },
+      model: { type: 'string', description: "Optional override for the agent's default model." },
+      permission: {
+        type: 'string',
+        enum: ['ask', 'auto', 'yolo'],
+        description: 'Permission level for the spawned backend.',
+      },
       cwd: { type: 'string', description: 'Working directory for the spawned runtime.' },
     },
     required: ['agent', 'task'],

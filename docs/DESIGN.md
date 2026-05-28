@@ -113,8 +113,12 @@ kman ships a stdio MCP server (`@kman/mcp-server`) exposed through `kman mcp`. T
 
 Two distribution paths:
 
-1. **Auto-injection.** `kman run` and `kman chat` materialize a tiny "injection plugin" at `~/.kman/runtime/mcp-injection/` (a `plugin.json` + `.mcp.json` that registers `kman` as an MCP server) and push it into the backend with `--plugin-dir`. The running agent's name flows through the `KMAN_SELF_AGENT` env var, which the MCP server reads to hide the calling agent from its own roster and refuse self-dispatch. Setting `KMAN_NO_MCP=1` opts out per process.
+1. **Auto-injection.** `kman run` and `kman chat` materialize a single standalone MCP config at `~/.kman/runtime/mcp-config.json` and hand it to the backend through its native flag — `--mcp-config` for claude-code, `--additional-mcp-config` for copilot-cli. No plugin wrapper involved, so the host registers the server in its plain namespace (`mcp__kman__<surface>`) instead of a longer plugin-scoped form. The running agent's name flows through the `KMAN_SELF_AGENT` env var, substituted into the config at spawn time, which the MCP server reads to hide the calling agent from its own roster and refuse self-dispatch. Setting `KMAN_NO_MCP=1` opts out per process.
 2. **External runtimes.** `kman mcp install claude-code | copilot-cli` writes a `mcpServers.kman` entry into the runtime's user-scope config. `kman mcp config` prints the JSON snippet for hosts that aren't directly supported.
+
+Both paths produce the same `mcp__kman__<surface>` naming, so prompts, tool calls, and slash commands look identical whether the user opted in via global install or got the auto-injection.
+
+Beyond raw tools, the server returns server-level usage `instructions` on every `initialize` (a short guideline the host can inject as system-prompt context, nudging the model to call `kman_list_agents` proactively) and exposes four prompt templates via `prompts/list`: `list-agents`, `find-agent`, `delegate-task`, and `second-opinion`. Hosts that surface MCP prompts as slash commands turn these into one-keystroke workflows.
 
 Cycle and depth protection are carried through `KMAN_RUN_CHAIN` — a comma-separated list of agents in the current delegation stack. The MCP server rejects any dispatch whose target is already in the chain, and refuses to spawn beyond depth 8. The subprocess invariant (each `kman_run_agent` re-shells `kman` rather than running in-process) keeps the MCP server's stdout transport isolated from peer agents' stdio.
 
@@ -457,14 +461,15 @@ kman/
 │   │   └── src/backend.ts
 │   ├── backend-claude-code/
 │   ├── backend-copilot-cli/
-│   └── mcp-server/                   # @kman/mcp-server — stdio MCP server + auto-injection plugin
+│   └── mcp-server/                   # @kman/mcp-server — stdio MCP server + auto-injection config
 │       └── src/
-│           ├── server.ts             # JSON-RPC dispatch over stdio
+│           ├── server.ts             # JSON-RPC dispatch over stdio, initialize instructions
 │           ├── tools.ts              # kman_list_agents / kman_describe_agent / kman_run_agent
 │           ├── resources.ts          # kman://agents and kman://agents/{name}
+│           ├── prompts.ts            # list-agents / find-agent / delegate-task / second-opinion templates
 │           ├── agents.ts             # roster discovery + per-agent read
 │           ├── runner.ts             # re-shells `kman -a <name> run --task ...`
-│           ├── injection.ts          # materializes ~/.kman/runtime/mcp-injection
+│           ├── injection.ts          # materializes ~/.kman/runtime/mcp-config.json
 │           └── protocol.ts           # JSON-RPC types + error codes
 ├── docs/
 │   └── DESIGN.md                     # this file

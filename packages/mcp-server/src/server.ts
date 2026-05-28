@@ -9,8 +9,35 @@ import {
 } from './protocol.js';
 import { callTool, listTools, type ToolHandlerCtx } from './tools.js';
 import { listResources, listResourceTemplates, readResource } from './resources.js';
+import { getPrompt, listPrompts } from './prompts.js';
 
 const MCP_PROTOCOL_VERSION = '2024-11-05';
+
+/**
+ * Server-level usage guidance returned in the `initialize` response.
+ * Per MCP spec the host MAY surface this to its LLM as system-prompt
+ * context, which is how we get models to *proactively* consider kman
+ * instead of waiting to be told. Kept short to limit token cost.
+ */
+const KMAN_USAGE_INSTRUCTIONS = `\
+This MCP server (kman) exposes locally managed specialist agents. Each agent has its own soul prompt, \
+skills, and backend.
+
+When a user request may benefit from a specialist (code review, refactoring, research, test writing, \
+doc rewrites, niche-domain analysis), consider delegating:
+
+  1. Call \`kman_list_agents\` to see the current local roster.
+  2. If needed, call \`kman_describe_agent\` to confirm fit from the agent's profile and soul prompt.
+  3. Call \`kman_run_agent\` with the agent name and a self-contained task. The response is the agent's \
+    stdout; incorporate it into your own answer and cite the agent by name.
+
+If no agent fits, do the work yourself. Each \`kman_run_agent\` call is a fresh one-shot run; sessions \
+are not shared and the peer cannot see your conversation or scratch notes. Self-delegation and cycles \
+are blocked server-side.
+
+For reusable workflows, four prompts are available for hosts to surface as slash commands: \
+\`list-agents\` (show the roster), \`find-agent\` (choose a specialist), \`delegate-task\` (hand \
+a task off), and \`second-opinion\` (independent review).`;
 
 export interface McpServerOptions {
   /** When set, hide this agent from listings and refuse to dispatch to it. */
@@ -146,8 +173,10 @@ async function dispatch(
         capabilities: {
           tools: { listChanged: false },
           resources: { listChanged: false, subscribe: false },
+          prompts: { listChanged: false },
         },
         serverInfo: { name: 'kman', version: kmanVersion() },
+        instructions: KMAN_USAGE_INSTRUCTIONS,
       };
     case 'notifications/initialized':
     case 'notifications/cancelled':
@@ -176,7 +205,14 @@ async function dispatch(
       return { contents: [content] };
     }
     case 'prompts/list':
-      return { prompts: [] };
+      return { prompts: listPrompts() };
+    case 'prompts/get': {
+      const p = asObject(params);
+      const name = typeof p['name'] === 'string' ? p['name'] : '';
+      const args = (p['arguments'] as Record<string, string>) ?? {};
+      if (!name) throw new RpcError(ErrorCode.InvalidParams, 'prompts/get requires "name".');
+      return getPrompt(name, args);
+    }
     default:
       throw new RpcError(ErrorCode.MethodNotFound, `Method not implemented: ${method}`);
   }

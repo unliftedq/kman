@@ -47,13 +47,26 @@ describe('attachKmanMcp', () => {
     expect(augmented.env.KMAN_SELF_AGENT).toBe('coder');
   });
 
-  it('puts the injection plugin first in extraArgs and preserves user-supplied ones', async () => {
-    const ctx = makeCtx('coder', ['--my-flag', 'value']);
+  it('uses --mcp-config for claude-code and puts it before user extra args', async () => {
+    const ctx = makeCtx('coder', ['--my-flag', 'value'], 'claude-code');
     const augmented = await attachKmanMcp(ctx);
     const [first, second] = augmented.extraArgs;
-    expect(first).toBe('--plugin-dir');
-    expect(second).toMatch(/mcp-injection$/);
+    expect(first).toBe('--mcp-config');
+    expect(second).toMatch(/mcp-config\.json$/);
     expect(augmented.extraArgs.slice(2)).toEqual(['--my-flag', 'value']);
+  });
+
+  it('uses --additional-mcp-config for copilot-cli', async () => {
+    const ctx = makeCtx('coder', [], 'copilot-cli');
+    const augmented = await attachKmanMcp(ctx);
+    expect(augmented.extraArgs[0]).toBe('--additional-mcp-config');
+    expect(augmented.extraArgs[1]).toMatch(/mcp-config\.json$/);
+  });
+
+  it('skips injection for unknown backends rather than breaking the launch', async () => {
+    const ctx = makeCtx('coder', ['--keep'], 'fictional-backend');
+    const augmented = await attachKmanMcp(ctx);
+    expect(augmented).toBe(ctx);
   });
 
   it('initializes KMAN_RUN_CHAIN with the agent name when no chain is set', async () => {
@@ -80,18 +93,18 @@ function restore(key: string, prior: string | undefined): void {
   else process.env[key] = prior;
 }
 
-function makeCtx(name: string, extraArgs: string[] = []): AgentContext {
+function makeCtx(name: string, extraArgs: string[] = [], backend = 'claude-code'): AgentContext {
   return {
     profile: {
       name,
-      runtime: { default: 'claude-code' },
+      runtime: { default: backend },
       soul: { prompt_file: 'soul.md' },
       defaults: {},
       runtimeOverrides: {},
     },
     agentDir: `/tmp/${name}`,
     soulPrompt: 'soul',
-    backend: 'claude-code',
+    backend,
     permission: 'ask',
     outputFormat: 'text',
     cwd: '/tmp',
