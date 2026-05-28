@@ -72,12 +72,12 @@ export async function probeBinaryVersion(
       // Try graceful shutdown first; SIGKILL only as a fallback if the child
       // is still alive shortly after, so long-running --version prompts can
       // unwind cleanly.
-      if (!child.killed) child.kill('SIGTERM');
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
       setTimeout(() => {
-        if (!child.killed) child.kill('SIGKILL');
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
       }, 250).unref();
       finish({ ok: false, errorCode: 'ETIMEDOUT', errorMessage: `${bin} --version timed out` });
-    }, timeoutMs);
+    }, timeoutMs).unref();
 
     child.stdout?.on('data', (d: Buffer) => {
       stdout += d.toString('utf8');
