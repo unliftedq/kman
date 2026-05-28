@@ -126,10 +126,12 @@ export async function checkBackend(probe: BackendProbe): Promise<Check[]> {
         label: `${probe.name} binary`,
         severity: 'error',
         message: isMissing
-          ? `"${bin}" not found on PATH${overrideNote}.`
+          ? `"${bin}" not found${overrideNote}.`
           : `"${bin}" failed${overrideNote}: ${result.errorMessage ?? result.errorCode ?? 'unknown error'}`,
         detail: isMissing
-          ? `Install the ${probe.name} CLI, or set ${probe.envOverride ?? 'the binary'} to the desired path.`
+          ? probe.envOverride
+            ? `Install the ${probe.name} CLI, or set ${probe.envOverride} to the desired path.`
+            : `Install the ${probe.name} CLI, or ensure "${bin}" is on PATH.`
           : undefined,
       },
     ];
