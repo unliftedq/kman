@@ -2,6 +2,8 @@
 
 > Multi-agent management tool, *name is inspired by [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)* — a small society of named, well-tailored agents you can dispatch on a mission.
 
+[简体中文](README.zh-CN.md)
+
 `kman` sits *above* existing agent runtimes (Claude Code, GitHub Copilot CLI, ...) and gives each named agent its own isolated directory, soul prompt, skills, hooks, and MCP servers. One CLI to dispatch them all; one filesystem layout that every supported runtime can load natively.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the architecture, or jump straight to the published CLI: **[`@unliftedq/kman`](apps/cli/README.md)**.
