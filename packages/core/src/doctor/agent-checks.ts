@@ -18,8 +18,11 @@ async function pathExists(p: string): Promise<boolean> {
   try {
     await stat(p);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw err;
   }
 }
 
@@ -81,7 +84,13 @@ async function checkSoul(profile: Profile): Promise<Check> {
 
 async function checkMcpJson(agent: string): Promise<Check[]> {
   const path = join(agentDir(agent), '.mcp.json');
-  if (!(await pathExists(path))) {
+  let exists: boolean;
+  try {
+    exists = await pathExists(path);
+  } catch (err) {
+    return [{ id: 'mcp.present', label: '.mcp.json', severity: 'error', message: (err as Error).message }];
+  }
+  if (!exists) {
     return [
       {
         id: 'mcp.present',
@@ -214,7 +223,13 @@ function extractPluginScript(command: string): string | null {
 
 async function checkHooks(agent: string): Promise<Check[]> {
   const path = join(agentDir(agent), 'hooks', 'hooks.json');
-  if (!(await pathExists(path))) {
+  let exists: boolean;
+  try {
+    exists = await pathExists(path);
+  } catch (err) {
+    return [{ id: 'hooks.present', label: 'hooks/hooks.json', severity: 'error', message: (err as Error).message }];
+  }
+  if (!exists) {
     return [{ id: 'hooks.present', label: 'hooks/hooks.json', severity: 'info', message: 'not present.' }];
   }
   let raw: string;
@@ -378,7 +393,13 @@ async function checkSkills(agent: string): Promise<Check[]> {
  */
 export async function runAgentChecks(agent: string): Promise<Check[]> {
   const dir = agentDir(agent);
-  if (!(await pathExists(dir))) {
+  let exists: boolean;
+  try {
+    exists = await pathExists(dir);
+  } catch (err) {
+    return [{ id: 'agent.exists', label: 'agent directory', severity: 'error', message: (err as Error).message }];
+  }
+  if (!exists) {
     return [
       {
         id: 'agent.exists',
