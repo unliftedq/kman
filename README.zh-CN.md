@@ -1,8 +1,8 @@
 # kman
 
-> 面向多 agent 协作的管理工具。名字来自 [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)：不是一个“全能助手”，而是一组各司其职、可按任务派遣的 agent。
+<p align="center"><a href="README.md">English</a> · <strong>简体中文</strong></p>
 
-[English](README.md)
+> 面向多 agent 协作的管理工具。名字来自 [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)：不是一个“全能助手”，而是一组各司其职、可按任务派遣的 agent。
 
 `kman` 不是模型运行时本身，而是运行时之上的统一调度层。你可以在 Claude Code、GitHub Copilot CLI 等后端之上，维护一组具名 agent（如 `orchestrator`、`developer`、`researcher`），让每个 agent 拥有独立目录、独立灵魂提示词（soul prompt）、独立 skills/hooks/MCP 配置，并在需要时精准调用。
 
