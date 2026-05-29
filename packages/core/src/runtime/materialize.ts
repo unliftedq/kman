@@ -1,5 +1,6 @@
-import { cp, mkdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { cp, mkdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { isAbsolute, dirname, join } from 'node:path';
 import type { BackendName, Profile } from '@kman/types';
 import { agentDir, agentSoulPath } from '../paths.js';
 import { KMAN_PLUGIN_NAME, runtimePluginDir, type PluginLayout } from './paths.js';
@@ -41,8 +42,14 @@ export function pluginLayoutForBackend(backend: BackendName): PluginLayout | und
  * The plugin manifest and the contributed `agents/<name>.md` are generated
  * fresh; the user-owned component dirs and `.mcp.json` are symlinked back to
  * the agent directory (copied where symlinks are unavailable) so edits stay
- * in sync without duplicating data. The directory is rebuilt from scratch on
- * every call so deletions in the agent dir never linger as stale links.
+ * in sync without duplicating data.
+ *
+ * To stay safe against concurrent launches of the same agent/backend, the
+ * plugin is built in full inside a unique staging directory and then swapped
+ * into place with an atomic rename. A reader never observes a partially
+ * rebuilt plugin: it sees either the previous complete plugin or the new one.
+ * The from-scratch staging build also guarantees deletions in the agent dir
+ * never linger as stale links.
  */
 export async function materializeRuntimePlugin(
   profile: Profile,
@@ -50,8 +57,26 @@ export async function materializeRuntimePlugin(
 ): Promise<MaterializedPlugin> {
   const src = agentDir(profile.name);
   const pluginDir = runtimePluginDir(profile.name, layout);
+  const staging = `${pluginDir}.staging-${process.pid}-${randomUUID()}`;
 
-  await rm(pluginDir, { recursive: true, force: true });
+  try {
+    await buildPlugin(staging, src, profile, layout);
+    await swapIntoPlace(staging, pluginDir);
+  } catch (err) {
+    await rm(staging, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
+
+  return { pluginDir, pluginAgent: `${KMAN_PLUGIN_NAME}:${profile.name}` };
+}
+
+/** Build a complete plugin tree under `pluginDir` (expected to be a staging dir). */
+async function buildPlugin(
+  pluginDir: string,
+  src: string,
+  profile: Profile,
+  layout: PluginLayout,
+): Promise<void> {
   await mkdir(pluginDir, { recursive: true });
 
   await writeManifest(pluginDir, profile, layout);
@@ -78,8 +103,42 @@ export async function materializeRuntimePlugin(
       await linkOrCopy(from, join(pluginDir, file), 'file');
     }
   }
+}
 
-  return { pluginDir, pluginAgent: `${KMAN_PLUGIN_NAME}:${profile.name}` };
+/**
+ * Atomically replace `pluginDir` with the freshly built `staging` directory.
+ * `rename` cannot clobber a non-empty directory, so any existing plugin is
+ * first moved aside to a unique trash name (an atomic rename) and the staging
+ * dir is renamed into the now-vacant slot. If a concurrent launch repopulates
+ * the slot in between, the rename is retried. A reader therefore only ever
+ * sees a complete plugin (or, for a sub-rename instant, nothing at all) and
+ * never a half-built one.
+ */
+async function swapIntoPlace(staging: string, pluginDir: string): Promise<void> {
+  await mkdir(dirname(pluginDir), { recursive: true });
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const trash = `${pluginDir}.trash-${process.pid}-${randomUUID()}`;
+    let movedAside = false;
+    try {
+      await rename(pluginDir, trash);
+      movedAside = true;
+    } catch (cause) {
+      if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause;
+    }
+    try {
+      await rename(staging, pluginDir);
+    } catch (cause) {
+      if (movedAside) await rm(trash, { recursive: true, force: true }).catch(() => {});
+      // A concurrent launch slotted its own plugin in after we cleared the
+      // slot. Retry: move the newcomer aside and try to claim it again.
+      const code = (cause as NodeJS.ErrnoException).code;
+      if (code === 'ENOTEMPTY' || code === 'EEXIST') continue;
+      throw cause;
+    }
+    if (movedAside) await rm(trash, { recursive: true, force: true }).catch(() => {});
+    return;
+  }
+  throw new Error(`materializeRuntimePlugin: could not swap ${staging} into ${pluginDir}`);
 }
 
 async function writeManifest(

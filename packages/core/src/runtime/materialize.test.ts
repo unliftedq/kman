@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { lstat, mkdir, mkdtemp, readFile, readlink, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readdir, readFile, readlink, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Profile } from '@kman/types';
@@ -128,5 +128,40 @@ describe('materializeRuntimePlugin', () => {
       await readFile(join(withDesc.pluginDir, '.claude-plugin', 'plugin.json'), 'utf8'),
     );
     expect(m2.description).toBe('C# review');
+  });
+
+  test('concurrent materializations never expose a partially built plugin', async () => {
+    const layout = 'claude' as const;
+    const target = runtimePluginDir('coder', layout);
+    let observedPartial = false;
+
+    // While many materializations run in parallel, repeatedly check that the
+    // manifest, when present, is always complete and valid.
+    const watcher = (async () => {
+      for (let i = 0; i < 200; i++) {
+        try {
+          const raw = await readFile(join(target, '.claude-plugin', 'plugin.json'), 'utf8');
+          const manifest = JSON.parse(raw);
+          if (manifest.name !== 'kman') observedPartial = true;
+        } catch (err) {
+          // ENOENT during the swap window is expected; malformed JSON is not.
+          if ((err as NodeJS.ErrnoException).code !== 'ENOENT') observedPartial = true;
+        }
+      }
+    })();
+
+    await Promise.all([
+      ...Array.from({ length: 16 }, () => materializeRuntimePlugin(mkProfile(), layout)),
+      watcher,
+    ]);
+
+    expect(observedPartial).toBe(false);
+    // The final state is a single complete plugin with no leftover temp dirs.
+    const m = JSON.parse(await readFile(join(target, '.claude-plugin', 'plugin.json'), 'utf8'));
+    expect(m.name).toBe('kman');
+    const leftovers = (await readdir(join(home, 'runtime', 'coder'))).filter(
+      (e) => e.includes('.staging-') || e.includes('.trash-'),
+    );
+    expect(leftovers).toEqual([]);
   });
 });
