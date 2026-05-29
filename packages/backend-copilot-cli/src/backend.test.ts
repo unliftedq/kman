@@ -26,10 +26,11 @@ function mkCtx(overrides: Partial<AgentContext> = {}): AgentContext {
 
 // `buildArgs` is private; TS-private is compile-time only — reach in for assertions.
 function argsFor(b: CopilotCliBackend, ctx: AgentContext, interactive: boolean): string[] {
-  return (b as unknown as { buildArgs: (c: AgentContext, i: boolean) => string[] }).buildArgs(
-    ctx,
-    interactive,
-  );
+  return (
+    b as unknown as {
+      buildArgs: (c: AgentContext, pluginDir: string, pluginAgent: string, i: boolean) => string[];
+    }
+  ).buildArgs(ctx, '/tmp/runtime/coder/.copilot', 'kman:coder', interactive);
 }
 
 describe('CopilotCliBackend metadata', () => {
@@ -64,7 +65,7 @@ describe('CopilotCliBackend argv construction (run mode)', () => {
     const b = new CopilotCliBackend();
     const args = argsFor(b, mkCtx(), false);
     expect(args).toContain('--plugin-dir');
-    expect(args[args.indexOf('--plugin-dir') + 1]).toBe('/tmp/agents/coder');
+    expect(args[args.indexOf('--plugin-dir') + 1]).toBe('/tmp/runtime/coder/.copilot');
   });
 
   test('emits --agent <name>:<name> — the scoped form copilot requires for plugin agents', () => {
@@ -72,7 +73,7 @@ describe('CopilotCliBackend argv construction (run mode)', () => {
     const args = argsFor(b, mkCtx(), false);
     const idx = args.indexOf('--agent');
     expect(idx).toBeGreaterThanOrEqual(0);
-    expect(args[idx + 1]).toBe('coder:coder');
+    expect(args[idx + 1]).toBe('kman:coder');
   });
 
   test('ask permission emits no permission flag (copilot prompts by default)', () => {
@@ -204,7 +205,7 @@ describe('CopilotCliBackend argv construction (chat mode)', () => {
     const args = argsFor(b, mkCtx({ permission: 'auto' }), true);
     expect(args).toContain('--plugin-dir');
     expect(args).toContain('--agent');
-    expect(args[args.indexOf('--agent') + 1]).toBe('coder:coder');
+    expect(args[args.indexOf('--agent') + 1]).toBe('kman:coder');
     expect(args).toContain('--allow-all-tools');
   });
 
@@ -215,6 +216,6 @@ describe('CopilotCliBackend argv construction (chat mode)', () => {
     const b = new CopilotCliBackend();
     const args = argsFor(b, mkCtx({ soulPrompt: 'you are coder' }), true);
     expect(args).toContain('--agent');
-    expect(args[args.indexOf('--agent') + 1]).toBe('coder:coder');
+    expect(args[args.indexOf('--agent') + 1]).toBe('kman:coder');
   });
 });

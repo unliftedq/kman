@@ -1,5 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { spawnBackend } from '@kman/backend-base';
+import { materializeRuntimePlugin } from '@kman/core';
 import type {
   AgentContext,
   Backend,
@@ -23,9 +24,10 @@ import type {
  *   --allow-all-tools       auto-approve every tool call (required for non-interactive)
  *   --yolo                  short for --allow-all-{tools,paths,urls}
  *
- * Soul prompt: delivered as a plugin-contributed agent. The kman agent dir's
- * `plugin.json` declares `"agents": "agents/"`, the soul lives at
- * `agents/<name>.md`, and we invoke `--agent <name>:<name>` (copilot rejects
+ * Soul prompt: delivered as a plugin-contributed agent. kman materializes a
+ * runtime plugin under ~/.kman/runtime/<name>/.copilot whose `plugin.json`
+ * declares `"agents": "agents/"` and a fixed plugin name `kman`; the soul lives
+ * at `agents/<name>.md`, and we invoke `--agent kman:<name>` (copilot rejects
  * the bare name for plugin agents — the scoped form is mandatory).
  */
 const PERMISSION_FLAG: Record<PermissionLevel, string | null> = {
@@ -53,23 +55,30 @@ export class CopilotCliBackend implements Backend {
   }
 
   async spawn(ctx: AgentContext, _opts?: RunOptions): Promise<ChildProcess> {
-    const args = this.buildArgs(ctx, /* interactive */ false);
+    const { pluginDir, pluginAgent } = await materializeRuntimePlugin(ctx.profile, 'copilot');
+    const args = this.buildArgs(ctx, pluginDir, pluginAgent, /* interactive */ false);
     return spawnBackend(ctx, { command: this.binary, args });
   }
 
   async chat(ctx: AgentContext, _opts?: ChatOptions): Promise<ChildProcess> {
-    const args = this.buildArgs(ctx, /* interactive */ true);
+    const { pluginDir, pluginAgent } = await materializeRuntimePlugin(ctx.profile, 'copilot');
+    const args = this.buildArgs(ctx, pluginDir, pluginAgent, /* interactive */ true);
     return spawnBackend(ctx, { command: this.binary, args });
   }
 
-  private buildArgs(ctx: AgentContext, interactive: boolean): string[] {
+  private buildArgs(
+    ctx: AgentContext,
+    pluginDir: string,
+    pluginAgent: string,
+    interactive: boolean,
+  ): string[] {
     const args: string[] = [];
 
-    // Load the agent directory as a Copilot plugin (skills, hooks, MCP) and
-    // pick up its contributed agent definition. Plugin name == kman agent
-    // name; the scoped `<plugin>:<agent>` form is mandatory for plugin agents.
-    args.push('--plugin-dir', ctx.agentDir);
-    args.push('--agent', `${ctx.profile.name}:${ctx.profile.name}`);
+    // Load the materialized runtime plugin (skills, hooks, MCP) and pick up its
+    // contributed agent definition. Plugin name is fixed to `kman`; the scoped
+    // `kman:<agent>` form is mandatory for plugin agents.
+    args.push('--plugin-dir', pluginDir);
+    args.push('--agent', pluginAgent);
 
     // Permission mapping. The raw escape hatch suppresses kman's abstract
     // mapping entirely so the user can supply their own --allow-tool /

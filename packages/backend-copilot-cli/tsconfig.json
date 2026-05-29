@@ -4,10 +4,21 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.ts"],
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ],
   "references": [
-    { "path": "../types" },
-    { "path": "../backend-base" }
+    {
+      "path": "../types"
+    },
+    {
+      "path": "../backend-base"
+    },
+    {
+      "path": "../core"
+    }
   ]
 }

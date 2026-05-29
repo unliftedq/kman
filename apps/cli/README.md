@@ -58,12 +58,13 @@ kman agent rename <from> <to>
 kman agent delete <name> [--yes]
 ```
 
-`agent create` writes `~/.kman/agents/<name>/` with:
+`agent create` writes `~/.kman/agents/<name>/` with agent data only:
 
-- `soul.md` — the agent's system prompt (edit this).
+- `soul.md` — the agent's system prompt, with a `name:` frontmatter (edit this).
 - `agent.toml` — kman profile (default backend, model, permissions).
 - `skills/`, `hooks/`, `scripts/`, `.mcp.json` — empty scaffolding for per-agent extensions.
-- A small set of generated files that let Claude Code and Copilot CLI both pick up the directory natively; you normally don't need to touch them, and `agent rename` keeps them in sync.
+
+No plugin files are written into the agent directory. At launch kman materializes a runtime-native plugin (name fixed to `kman`) under `~/.kman/runtime/<name>/.claude` or `.copilot` and points the backend at it; that directory is derived state, rebuilt on each run, and removed by `agent delete` / `agent rename`.
 
 ### Running
 

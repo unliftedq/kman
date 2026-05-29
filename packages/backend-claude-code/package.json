@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@kman/backend-base": "workspace:*",
+    "@kman/core": "workspace:*",
     "@kman/types": "workspace:*"
   },
   "devDependencies": {

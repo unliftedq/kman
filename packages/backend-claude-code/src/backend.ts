@@ -1,5 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { spawnBackend } from '@kman/backend-base';
+import { materializeRuntimePlugin } from '@kman/core';
 import type {
   AgentContext,
   Backend,
@@ -10,7 +11,9 @@ import type {
 } from '@kman/types';
 
 /**
- * Claude Code adapter (§3.3). Loads agent dir directly via --plugin-dir.
+ * Claude Code adapter (§3.3). Loads the agent as a Claude Code plugin
+ * materialized under ~/.kman/runtime/<name>/.claude and selected via
+ * --plugin-dir. The agent directory itself holds only agent data.
  *
  * Permission mapping (abstract → claude-code's --permission-mode):
  *   ask    → default
@@ -42,26 +45,32 @@ export class ClaudeCodeBackend implements Backend {
   }
 
   async spawn(ctx: AgentContext, _opts?: RunOptions): Promise<ChildProcess> {
-    const args = this.buildArgs(ctx, /* interactive */ false);
+    const { pluginDir, pluginAgent } = await materializeRuntimePlugin(ctx.profile, 'claude');
+    const args = this.buildArgs(ctx, pluginDir, pluginAgent, /* interactive */ false);
     return spawnBackend(ctx, { command: this.binary, args });
   }
 
   async chat(ctx: AgentContext, _opts?: ChatOptions): Promise<ChildProcess> {
-    const args = this.buildArgs(ctx, /* interactive */ true);
+    const { pluginDir, pluginAgent } = await materializeRuntimePlugin(ctx.profile, 'claude');
+    const args = this.buildArgs(ctx, pluginDir, pluginAgent, /* interactive */ true);
     return spawnBackend(ctx, { command: this.binary, args });
   }
 
-  private buildArgs(ctx: AgentContext, interactive: boolean): string[] {
+  private buildArgs(
+    ctx: AgentContext,
+    pluginDir: string,
+    pluginAgent: string,
+    interactive: boolean,
+  ): string[] {
     const args: string[] = [];
 
-    // Plugin directory — load the agent dir as a Claude Code plugin (§4, §3.3).
-    args.push('--plugin-dir', ctx.agentDir);
+    // Plugin directory — load the materialized runtime plugin (§4, §3.3).
+    args.push('--plugin-dir', pluginDir);
 
-    // Soul prompt arrives via the plugin-contributed agent — `<plugin>:<agent>`
-    // is the scoped form Claude resolves at startup. The kman agent name doubles
-    // as both the plugin name (in .claude-plugin/plugin.json) and the agent name
-    // (frontmatter in agents/<name>.md), so we send `<name>:<name>`.
-    args.push('--agent', `${ctx.profile.name}:${ctx.profile.name}`);
+    // Soul prompt arrives via the plugin-contributed agent. The plugin name is
+    // fixed to `kman`, so the scoped selector Claude resolves at startup is
+    // `kman:<agent>` (frontmatter `name:` in agents/<name>.md).
+    args.push('--agent', pluginAgent);
 
     // Model override.
     if (ctx.model) {
