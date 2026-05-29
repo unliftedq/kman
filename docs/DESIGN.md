@@ -10,7 +10,7 @@ kman is **not** another agent runtime. It is an **agent manager** that sits abov
 
 1. **Named agent profiles** — each agent has its own soul, plugin files, and default runtime, addressable by name.
 2. **Backend-agnostic CLI** — one set of commands, one profile format, regardless of which underlying runtime does the work.
-3. **Claude Code plugin compatibility** — every kman agent directory is also a valid Claude Code plugin, so skills / hooks / MCP servers / commands written for the broader ecosystem work unchanged.
+3. **Claude Code plugin compatibility** — every kman agent is materialized into a valid Claude Code / Copilot plugin at launch (under `~/.kman/runtime/<name>/`), so skills / hooks / MCP servers / commands written for the broader ecosystem work unchanged.
 
 Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v1 deliberately ships only the CLI.
 
@@ -42,7 +42,7 @@ flowchart LR
     cli --> core[packages/core<br/>profile + context + launcher]
     core -->|build| ctx[AgentContext]
     ctx --> backend[Backend Adapter<br/>claude-code / copilot-cli]
-    backend -.loads as plugin.-> dir[~/.kman/agents/coder/<br/>Claude Code plugin layout]
+    backend -.materializes + loads as plugin.-> dir[~/.kman/runtime/coder/.claude<br/>derived plugin layout]
     backend -->|stdout / stderr| user
 ```
 
@@ -58,7 +58,7 @@ flowchart TB
     B --> C[3. Read soul prompt from soul.md]
     C --> D[4. Build AgentContext<br/>profile + soul + runtime + defaults]
     D --> E[5. Apply CLI overrides onto context<br/>--runtime / --permission / --model / ...]
-    E --> F[6. Spawn backend with the agent directory<br/>as a Claude Code plugin + rendered soul prompt]
+    E --> F[6. Materialize runtime plugin under ~/.kman/runtime/name<br/>then spawn backend with --plugin-dir + rendered soul]
     F --> G[7. Backend stdout/stderr stream to the user]
 ```
 
@@ -97,7 +97,7 @@ interface BackendCapabilities {
 
 Capability handling is fail-fast for required launch behavior: if a selected backend cannot accept the rendered soul prompt, kman exits with code 4 before spawning.
 
-For backends with `supportClaudeCodePlugin = true` (claude-code in v1), kman passes the agent directory directly via the backend's `--plugin-dir`. For other backends (copilot-cli, future codex/gemini), the adapter is responsible for translating the relevant subset of the plugin layout (skills, hooks, MCP servers) into the backend's native concepts, or declaring those features unsupported.
+For backends with `supportClaudeCodePlugin = true` (claude-code and copilot-cli in v1), kman materializes the agent into a backend-native plugin under `~/.kman/runtime/<name>/` (§4.1) and points the backend's `--plugin-dir` at it, selecting the contributed agent via `--agent kman:<name>`. The agent directory itself is never passed to the backend. For other backends (future codex/gemini), the adapter is responsible for translating the relevant subset of the layout (skills, hooks, MCP servers) into the backend's native concepts, or declaring those features unsupported.
 
 ### 3.4 Multi-agent invocation (via `kman mcp`)
 
@@ -132,19 +132,18 @@ Deferred for future work:
 
 ## 4. Storage Layout
 
-Every kman agent directory is a valid Claude Code plugin, following the [Claude Code plugin spec](https://code.claude.com/docs/en/plugins-reference). Backends that natively understand Claude Code plugins load the directory directly; other adapters read the same files through their own translation layer.
+An agent directory holds **only genuine agent data** — profile, soul, skills, hooks, MCP config. The Claude Code / Copilot **plugin layout is not stored here**; it is *derived* at launch into `~/.kman/runtime/<name>/` (see §4.1). Backends never point at the agent directory directly — they load the materialized runtime plugin.
 
 ```
 ~/.kman/
 └── agents/
-  └── coder/                          # agent directory = Claude Code plugin
+  └── coder/                          # agent directory = agent data only
     ├── agent.toml                  # kman profile (runtime, model, defaults)
-    ├── soul.md                     # kman system prompt (passed as append-system-prompt)
+    ├── soul.md                     # kman system prompt + plugin agent frontmatter (name:)
     ├── skills/                     # Claude Code skills: <name>/SKILL.md
     │   └── humanizer/
     │       ├── SKILL.md
     │       └── .kman-skill.json  # vendoring manifest (source / version / checksum)
-    ├── agents/                     # Claude Code subagent definitions (optional)
     ├── commands/                   # Claude Code flat slash commands (optional)
     ├── hooks/
     │   └── hooks.json              # Claude Code hook configuration
@@ -153,8 +152,6 @@ Every kman agent directory is a valid Claude Code plugin, following the [Claude 
     │   └── notify.sh
     ├── .mcp.json                   # Claude Code MCP server configuration
     ├── bin/                        # Executables added to backend Bash PATH
-    ├── .claude-plugin/              # Optional; only needed if the user wants a plugin manifest
-    │   └── plugin.json              #   metadata, version, userConfig, ... (hand-authored)
     └── logs/
       └── agent.log               # kman-side diagnostic log (not session data)
 ```
@@ -162,11 +159,36 @@ Every kman agent directory is a valid Claude Code plugin, following the [Claude 
 Notes on the layout:
 
 - **kman-specific files** are `agent.toml`, `soul.md`, and `.kman-skill.json` inside each vendored skill. Claude Code ignores top-level fields and files it does not recognize, so these coexist cleanly with the plugin spec.
-- **Plugin manifest is optional.** Claude Code auto-discovers components in their default locations and derives the plugin name from the directory name, so an agent directory loads as a valid plugin without `.claude-plugin/plugin.json`. Add one only when you need metadata (`version`, `description`, `userConfig`, custom component paths, ...). kman does not create or maintain it.
+- **No plugin scaffolding in the agent dir.** `.claude-plugin/plugin.json`, `plugin.json`, and `agents/<name>.md` are **not** written here. They are generated under `~/.kman/runtime/<name>/` at launch (§4.1), so the agent directory stays a clean, diffable record of intent.
 - **Path substitution** inside plugin files uses Claude Code's variables: `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_PLUGIN_DATA}`, `${CLAUDE_PROJECT_DIR}`, `${user_config.KEY}`, and `${ENV_VAR}`.
-- **Secrets** are never stored in plain config. Use Claude Code's `userConfig` with `"sensitive": true` in `plugin.json`, or supply secrets through the launch environment, then reference them via `${user_config.KEY}` / `${ENV_VAR}` in `.mcp.json` and `hooks/hooks.json`.
+- **Secrets** are never stored in plain config. Use Claude Code's `userConfig` with `"sensitive": true`, or supply secrets through the launch environment, then reference them via `${user_config.KEY}` / `${ENV_VAR}` in `.mcp.json` and `hooks/hooks.json`.
 - **`bin/`** follows Claude Code semantics: executables become bare commands inside the backend's Bash tool while the plugin is enabled. It does not mutate kman's own process `PATH`.
 - **No `sessions/` directory.** Sessions live in the backend's own storage. kman does not write a unified session log in v1.
+
+### 4.1 Runtime plugin materialization
+
+Plugin layout is a *backend implementation detail*, not agent data — so kman keeps it out of the agent directory and materializes it on demand under `~/.kman/runtime/<name>/`:
+
+```
+~/.kman/runtime/
+├── mcp-config.json                    # shared kman-MCP injection config (§3.4)
+└── coder/
+  ├── .claude/                       # complete Claude Code plugin (claude-code)
+  │   ├── .claude-plugin/plugin.json #   { "name": "kman", "agents": ["./agents/coder.md"] }
+  │   ├── agents/coder.md            #   → soul.md
+  │   ├── skills/ hooks/ scripts/ bin/ commands/   # → agent dir (symlink, copy fallback)
+  │   └── .mcp.json                  #   → agent dir
+  └── .copilot/                      # complete Copilot plugin (copilot-cli)
+    ├── plugin.json                  #   { "name": "kman", "agents": "agents/" }
+    ├── agents/coder.md              #   → soul.md
+    ├── skills/ hooks/ scripts/ bin/ commands/
+    └── .mcp.json
+```
+
+- **Fixed plugin name.** Every materialized plugin declares `"name": "kman"`, so the backend selector is always `kman:<agent>` (`--agent kman:coder`). The contributed agent's own name comes from `soul.md`'s YAML frontmatter `name:`.
+- **Mapped, not copied.** Component dirs (`skills/`, `hooks/`, `scripts/`, `bin/`, `commands/`) and `.mcp.json` are symlinked back to the agent directory so edits stay in sync without duplication; on platforms/filesystems without symlink support kman falls back to a recursive copy. The manifest and `agents/<name>.md` are generated fresh.
+- **Rebuilt every launch.** The per-layout directory is removed and recreated on each spawn, so removed skills/hooks never linger as stale entries. The directory is derived state and safe to delete at any time. `kman agent rename` / `delete` drop the matching `~/.kman/runtime/<name>/` tree.
+- **Loaded via `--plugin-dir`.** The backend points `--plugin-dir` at `~/.kman/runtime/<name>/.claude` (claude-code) or `.copilot` (copilot-cli).
 
 ---
 
@@ -302,7 +324,7 @@ kman agent delete coder [--yes]
 kman agent rename coder reviewer
 ```
 
-`kman agent create` does not write `.claude-plugin/plugin.json`. Claude Code treats a directory without a manifest as a valid plugin, deriving the plugin name from the directory name. Users add `.claude-plugin/plugin.json` by hand only if they need metadata such as `version`, `description`, or `userConfig`.
+`kman agent create` scaffolds an agent directory with **agent data only** (`agent.toml`, `soul.md` with its `name:` frontmatter, `skills/`, `hooks/`, `scripts/`, `.mcp.json`). It does **not** write plugin scaffolding — `.claude-plugin/plugin.json`, `plugin.json`, and `agents/<name>.md` are derived at launch under `~/.kman/runtime/<name>/` (§4.1). `agent delete` / `agent rename` also drop the matching runtime directory.
 
 ### 6.2 Skills
 
@@ -321,14 +343,13 @@ kman skills remove --agent coder --skill humanizer
 
 ### 6.3 Plugin files
 
-kman does not provide `mcp` or `hook` subcommands. Users edit plugin files directly:
+kman does not provide `mcp` or `hook` subcommands. Users edit agent files directly:
 
 - `~/.kman/agents/<name>/.mcp.json` for per-agent MCP servers.
 - `~/.kman/agents/<name>/hooks/hooks.json` for hook configuration.
 - `~/.kman/agents/<name>/scripts/` for hook / utility scripts referenced by `hooks.json`.
-- `~/.kman/agents/<name>/.claude-plugin/plugin.json` (optional) for plugin metadata and `userConfig` declarations — hand-authored when needed.
 
-Format, events, environment variables, and path substitution all follow the Claude Code plugin spec.
+These files live in the agent directory and are mapped into the derived runtime plugin at launch (§4.1). Format, events, environment variables, and path substitution all follow the Claude Code plugin spec. To override the generated manifest (e.g. add `version` or `userConfig`), edit it in the materialized `~/.kman/runtime/<name>/.{claude,copilot}/` plugin — but note the directory is rebuilt on each launch.
 
 ### 6.4 Run / chat
 
@@ -447,6 +468,7 @@ kman/
 │   │   └── src/
 │   │       ├── profile/              # TOML read/write/validate
 │   │       ├── context/              # AgentContext builder
+│   │       ├── runtime/             # materializes ~/.kman/runtime/<name>/.{claude,copilot} plugins
 │   │       ├── secrets/              # launch env helpers
 │   │       ├── launcher/             # spawns backend, passes stdio through
 │   │       └── prompt/               # render soul prompt
