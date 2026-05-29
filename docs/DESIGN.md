@@ -349,7 +349,7 @@ kman does not provide `mcp` or `hook` subcommands. Users edit agent files direct
 - `~/.kman/agents/<name>/hooks/hooks.json` for hook configuration.
 - `~/.kman/agents/<name>/scripts/` for hook / utility scripts referenced by `hooks.json`.
 
-These files live in the agent directory and are mapped into the derived runtime plugin at launch (§4.1). Format, events, environment variables, and path substitution all follow the Claude Code plugin spec. To override the generated manifest (e.g. add `version` or `userConfig`), edit it in the materialized `~/.kman/runtime/<name>/.{claude,copilot}/` plugin — but note the directory is rebuilt on each launch.
+These files live in the agent directory and are mapped into the derived runtime plugin at launch (§4.1). Format, events, environment variables, and path substitution all follow the Claude Code plugin spec. The materialized `~/.kman/runtime/<name>/.{claude,copilot}/` plugin is generated output and is rebuilt on each launch, so users should not edit files there for persistent customization. In v1, persistent plugin customization is limited to the agent-directory files above; generated manifest fields such as `version` or `userConfig` are not user-overridable via the runtime directory.
 
 ### 6.4 Run / chat
 
