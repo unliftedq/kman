@@ -1,4 +1,4 @@
-# kman
+<p align="center"><img src="assets/banner.png" alt="kman" /></p>
 
 <p align="center"><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
 
