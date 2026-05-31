@@ -1,7 +1,9 @@
 import { runAgentChecks, DEFAULT_BACKEND_PROBES, type BackendProbe } from './agent-checks.js';
 import { checkBackend } from './backend.js';
-import { kmanHome } from '../paths.js';
-import type { Report, Section } from './types.js';
+import { kmanHome, configPath } from '../paths.js';
+import { readConfig } from '../config/read.js';
+import { isKnownBackend } from '../config/validate.js';
+import type { Check, Report, Section } from './types.js';
 
 export interface RunDoctorOptions {
   /** Optional agent name; when present, adds an agent-scoped section. */
@@ -36,6 +38,7 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<Report> {
         severity: 'ok',
         message: `${process.platform} ${process.arch} (node ${process.version})`,
       },
+      await checkConfig(),
     ],
   });
 
@@ -52,4 +55,40 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<Report> {
   }
 
   return { sections, generatedAt: new Date().toISOString() };
+}
+
+/**
+ * Report the effective default runtime drawn from config.json. A parse error is
+ * a warning (not fatal): agents already on disk are unaffected, only future
+ * `agent create` invocations fall back to the built-in default.
+ */
+async function checkConfig(): Promise<Check> {
+  try {
+    const config = await readConfig();
+    const runtime = config.defaults.runtime;
+    if (!isKnownBackend(runtime)) {
+      return {
+        id: 'env.config',
+        label: 'config.json',
+        severity: 'warn',
+        message: `defaults.runtime="${runtime}" has no built-in adapter`,
+        detail: configPath(),
+      };
+    }
+    return {
+      id: 'env.config',
+      label: 'config.json',
+      severity: 'ok',
+      message: `defaults.runtime=${runtime}`,
+      detail: configPath(),
+    };
+  } catch (err) {
+    return {
+      id: 'env.config',
+      label: 'config.json',
+      severity: 'warn',
+      message: (err as Error).message,
+      detail: configPath(),
+    };
+  }
 }

@@ -1,6 +1,7 @@
 export * from './paths.js';
 export * from './runtime/index.js';
 export * from './profile/index.js';
+export * from './config/index.js';
 export * from './context/index.js';
 export * from './prompt/index.js';
 export * from './mcp-prompts/index.js';

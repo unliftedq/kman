@@ -6,6 +6,7 @@ import {
   agentsRoot,
   agentSoulPath,
   defaultProfile,
+  readConfig,
   readProfile,
   runtimeAgentRoot,
   validateAgentName,
@@ -43,12 +44,26 @@ export function buildAgentCommand(): Command {
       await mkdir(join(dir, 'hooks'), { recursive: true });
       await mkdir(join(dir, 'scripts'), { recursive: true });
 
-      const profileInit: Parameters<typeof defaultProfile>[1] = {};
+      // Seed unspecified fields from the global config.json so a user who lives
+      // on one backend doesn't have to repeat --runtime on every create.
+      const config = await readConfig();
+      const runtime = opts.runtime ?? config.defaults.runtime;
+      const model = opts.model ?? config.defaults.model;
+
+      const profileInit: Parameters<typeof defaultProfile>[1] = {
+        runtime: { default: runtime, ...(model !== undefined ? { model } : {}) },
+      };
       if (opts.description) profileInit.description = opts.description;
-      if (opts.runtime) profileInit.runtime = { default: opts.runtime };
-      if (opts.model) {
-        profileInit.runtime = { ...(profileInit.runtime ?? { default: 'claude-code' }), model: opts.model };
-      }
+      const seededDefaults = {
+        ...(config.defaults.permission_mode !== undefined
+          ? { permission_mode: config.defaults.permission_mode }
+          : {}),
+        ...(config.defaults.output_format !== undefined
+          ? { output_format: config.defaults.output_format }
+          : {}),
+        ...(config.defaults.max_turns !== undefined ? { max_turns: config.defaults.max_turns } : {}),
+      };
+      if (Object.keys(seededDefaults).length > 0) profileInit.defaults = seededDefaults;
       const profile = defaultProfile(name, profileInit);
       await writeProfile(profile);
 

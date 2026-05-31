@@ -136,6 +136,7 @@ An agent directory holds **only genuine agent data** — profile, soul, skills, 
 
 ```
 ~/.kman/
+├── config.json                        # global defaults for new agents (§4.2)
 └── agents/
   └── coder/                          # agent directory = agent data only
     ├── agent.toml                  # kman profile (runtime, model, defaults)
@@ -189,6 +190,26 @@ Plugin layout is a *backend implementation detail*, not agent data — so kman k
 - **Mapped, not copied.** Component dirs (`skills/`, `hooks/`, `scripts/`, `bin/`, `commands/`) and the agent's `mcp.json` (materialized as the backend dotfile `.mcp.json`) are symlinked back to the agent directory so edits stay in sync without duplication; on platforms/filesystems without symlink support kman falls back to a recursive copy. The manifest and `agents/<name>.md` are generated fresh.
 - **Rebuilt every launch.** The per-layout directory is removed and recreated on each spawn, so removed skills/hooks never linger as stale entries. The directory is derived state and safe to delete at any time. `kman agent rename` / `delete` drop the matching `~/.kman/runtime/<name>/` tree.
 - **Loaded via `--plugin-dir`.** The backend points `--plugin-dir` at `~/.kman/runtime/<name>/.claude` (claude-code) or `.copilot` (copilot-cli).
+
+### 4.2 Global config — `~/.kman/config.json`
+
+`config.json` holds **roster-wide defaults**, kept separate from per-agent `agent.toml`. Its job is to seed new agents created via `kman agent create` when the matching flag is omitted, so a user who lives on one backend never has to repeat `--runtime`. The file is JSON (not TOML) so it can be edited by hand or via `kman config set`.
+
+```json
+{
+  "defaults": {
+    "runtime": "copilot-cli",          // default backend for new agents (claude-code | copilot-cli)
+    "model": "gpt-5",                   // default model id (optional)
+    "permission_mode": "ask",          // ask | auto | yolo (optional)
+    "output_format": "text",           // text | json | stream-json (optional)
+    "max_turns": 50                     // positive integer (optional)
+  }
+}
+```
+
+- **Missing file is not an error.** When `config.json` is absent, kman falls back to a built-in baseline (`defaults.runtime = "claude-code"`), so first-run usage works with zero setup.
+- **Precedence at create time.** An explicit `agent create` flag always wins; otherwise the value comes from `config.json`; otherwise the built-in default. Existing agents are never rewritten when `config.json` changes — only future creations read it.
+- **Validated on read/write.** `permission_mode`, `output_format`, and `max_turns` are checked against the same rules as `agent.toml`. `runtime` may name a backend without a built-in adapter (forward-compat with future `codex` / `gemini`); `kman doctor` surfaces that as a warning.
 
 ---
 
@@ -324,7 +345,19 @@ kman agent delete coder [--yes]
 kman agent rename coder reviewer
 ```
 
-`kman agent create` scaffolds an agent directory with **agent data only** (`agent.toml`, `soul.md` with its `name:` frontmatter, `skills/`, `hooks/`, `scripts/`, `mcp.json`). It does **not** write plugin scaffolding — `.claude-plugin/plugin.json`, `plugin.json`, and `agents/<name>.md` are derived at launch under `~/.kman/runtime/<name>/` (§4.1). `agent delete` / `agent rename` also drop the matching runtime directory.
+`kman agent create` scaffolds an agent directory with **agent data only** (`agent.toml`, `soul.md` with its `name:` frontmatter, `skills/`, `hooks/`, `scripts/`, `mcp.json`). It does **not** write plugin scaffolding — `.claude-plugin/plugin.json`, `plugin.json`, and `agents/<name>.md` are derived at launch under `~/.kman/runtime/<name>/` (§4.1). `agent delete` / `agent rename` also drop the matching runtime directory. When `--runtime` / `--model` (and the `defaults.*` fields) are omitted, the new profile is seeded from `~/.kman/config.json` (§4.2), falling back to the built-in defaults.
+
+### 6.1.1 Global config
+
+```bash
+kman config show [--json]                             # effective config (built-in ⊕ config.json)
+kman config path                                      # print path to config.json
+kman config get  defaults.runtime
+kman config set  defaults.runtime copilot-cli         # writes ~/.kman/config.json
+kman config unset defaults.model                      # revert to built-in default
+```
+
+Settable keys: `defaults.runtime`, `defaults.model`, `defaults.permission_mode`, `defaults.output_format`, `defaults.max_turns`. `kman config` is a non-agent command and rejects `--agent`.
 
 ### 6.2 Skills
 
