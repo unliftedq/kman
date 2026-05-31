@@ -22,10 +22,10 @@ Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v
 - **No workflow DSL.** No `kman flow` command, no YAML pipelines. Multi-agent composition in v1 is shell pipes only.
 - **No session management.** v1 relies entirely on each backend's native session storage and resume. kman does not capture, normalize, index, or search sessions, and ships no `sessions` subcommands. Cross-backend session UX is a [TODO](#10-roadmap).
 - ~~**No agent-to-agent invocation.**~~ Agent-to-agent invocation now ships as `kman mcp` — a stdio MCP server that exposes the agent roster as MCP tools (`kman_list_agents`, `kman_describe_agent`, `kman_run_agent`) and resources (`kman://agents`, `kman://agents/<name>`). `kman run` and `kman chat` auto-inject the server into the spawned backend; external runtimes register it via `kman mcp install claude-code | copilot-cli`. Cycle and depth protection are handled via the `KMAN_RUN_CHAIN` env var (§3.4).
-- **No `doctor` command.** ~~Environment / backend / plugin diagnostics are deferred.~~ As of v1, `kman doctor` ships a minimal version: global backend-binary probes, plus agent-scoped checks for `agent.toml`, `soul`, `.mcp.json` shape, hook script presence/executability, `bin/` shadowing, and installed skills. Deeper integrations (`claude plugin validate`, `userConfig` ↔ env reconciliation) remain a [TODO](#10-roadmap).
+- **No `doctor` command.** ~~Environment / backend / plugin diagnostics are deferred.~~ As of v1, `kman doctor` ships a minimal version: global backend-binary probes, plus agent-scoped checks for `agent.toml`, `soul`, `mcp.json` shape, hook script presence/executability, `bin/` shadowing, and installed skills. Deeper integrations (`claude plugin validate`, `userConfig` ↔ env reconciliation) remain a [TODO](#10-roadmap).
 - **No project-local profiles.** All agents live at `~/.kman/`. No `.kman/` in repos.
 - **No skill template system.** New agents start with an empty skills directory.
-- **No shell / HTTP custom tools.** v1 only wires MCP tools through `.mcp.json`. Shell / HTTP tool adapters need a separate schema, timeout, quoting, and safety design.
+- **No shell / HTTP custom tools.** v1 only wires MCP tools through `mcp.json`. Shell / HTTP tool adapters need a separate schema, timeout, quoting, and safety design.
 - **No Codex / Gemini adapters in v1.** v1 implements `claude-code` and `copilot-cli` first.
 - **No config command in v1.** Global configuration commands are deferred until concrete global settings exist.
 - **No compiled binary distribution in v1.** v1 ships as an npm package consumed via `bun install -g @kman/cli`. Single-file native binaries (Bun `--compile`), Homebrew / Scoop / AUR packaging, and Docker images are [TODO](#10-roadmap).
@@ -118,7 +118,7 @@ Two distribution paths:
 
 Both paths produce the same `mcp__kman__<surface>` naming, so prompts, tool calls, and slash commands look identical whether the user opted in via global install or got the auto-injection.
 
-Beyond raw tools, the server returns server-level usage `instructions` on every `initialize` (a short guideline the host can inject as system-prompt context, nudging the model to call `kman_list_agents` proactively) and exposes four prompt templates via `prompts/list`: `list-agents`, `find-agent`, `delegate-task`, and `second-opinion`. Hosts that surface MCP prompts as slash commands turn these into one-keystroke workflows.
+Beyond raw tools, the server returns server-level usage `instructions` on every `initialize` (a short guideline the host can inject as system-prompt context, nudging the model to call `kman_list_agents` proactively) and exposes four prompt templates via `prompts/list`: `list-agents`, `find-agent`, `delegate-task`, and `second-opinion`. Hosts that surface MCP prompts as slash commands (e.g. claude-code) turn these into one-keystroke workflows. copilot-cli does **not** consume MCP prompts, so for the copilot layout the runtime-plugin materializer renders the same four templates as plugin **commands** (`kman-commands/<name>.md`, registered via the manifest's `commands` field) — giving copilot users the same `/list-agents`, `/find-agent`, … slash commands. The shared template definitions live in `@kman/core` (`mcp-prompts`) so the MCP server and the materializer stay in sync.
 
 Cycle and depth protection are carried through `KMAN_RUN_CHAIN` — a comma-separated list of agents in the current delegation stack. The MCP server rejects any dispatch whose target is already in the chain, and refuses to spawn beyond depth 8. The subprocess invariant (each `kman_run_agent` re-shells `kman` rather than running in-process) keeps the MCP server's stdout transport isolated from peer agents' stdio.
 
@@ -150,7 +150,7 @@ An agent directory holds **only genuine agent data** — profile, soul, skills, 
     ├── scripts/                    # Hook / utility scripts referenced from hooks.json
     │   ├── check-env.sh
     │   └── notify.sh
-    ├── .mcp.json                   # Claude Code MCP server configuration
+    ├── mcp.json                    # MCP server configuration (mapped to .mcp.json at launch)
     ├── bin/                        # Executables added to backend Bash PATH
     └── logs/
       └── agent.log               # kman-side diagnostic log (not session data)
@@ -161,7 +161,7 @@ Notes on the layout:
 - **kman-specific files** are `agent.toml`, `soul.md`, and `.kman-skill.json` inside each vendored skill. Claude Code ignores top-level fields and files it does not recognize, so these coexist cleanly with the plugin spec.
 - **No plugin scaffolding in the agent dir.** `.claude-plugin/plugin.json`, `plugin.json`, and `agents/<name>.md` are **not** written here. They are generated under `~/.kman/runtime/<name>/` at launch (§4.1), so the agent directory stays a clean, diffable record of intent.
 - **Path substitution** inside plugin files uses Claude Code's variables: `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_PLUGIN_DATA}`, `${CLAUDE_PROJECT_DIR}`, `${user_config.KEY}`, and `${ENV_VAR}`.
-- **Secrets** are never stored in plain config. Use Claude Code's `userConfig` with `"sensitive": true`, or supply secrets through the launch environment, then reference them via `${user_config.KEY}` / `${ENV_VAR}` in `.mcp.json` and `hooks/hooks.json`.
+- **Secrets** are never stored in plain config. Use Claude Code's `userConfig` with `"sensitive": true`, or supply secrets through the launch environment, then reference them via `${user_config.KEY}` / `${ENV_VAR}` in `mcp.json` and `hooks/hooks.json`.
 - **`bin/`** follows Claude Code semantics: executables become bare commands inside the backend's Bash tool while the plugin is enabled. It does not mutate kman's own process `PATH`.
 - **No `sessions/` directory.** Sessions live in the backend's own storage. kman does not write a unified session log in v1.
 
@@ -177,7 +177,7 @@ Plugin layout is a *backend implementation detail*, not agent data — so kman k
   │   ├── .claude-plugin/plugin.json #   { "name": "kman", "agents": ["./agents/coder.md"] }
   │   ├── agents/coder.md            #   → soul.md
   │   ├── skills/ hooks/ scripts/ bin/ commands/   # → agent dir (symlink, copy fallback)
-  │   └── .mcp.json                  #   → agent dir
+  │   └── .mcp.json                  #   → agent dir (mcp.json)
   └── .copilot/                      # complete Copilot plugin (copilot-cli)
     ├── plugin.json                  #   { "name": "kman", "agents": "agents/" }
     ├── agents/coder.md              #   → soul.md
@@ -186,7 +186,7 @@ Plugin layout is a *backend implementation detail*, not agent data — so kman k
 ```
 
 - **Fixed plugin name.** Every materialized plugin declares `"name": "kman"`, so the backend selector is always `kman:<agent>` (`--agent kman:coder`). The contributed agent's own name comes from `soul.md`'s YAML frontmatter `name:`.
-- **Mapped, not copied.** Component dirs (`skills/`, `hooks/`, `scripts/`, `bin/`, `commands/`) and `.mcp.json` are symlinked back to the agent directory so edits stay in sync without duplication; on platforms/filesystems without symlink support kman falls back to a recursive copy. The manifest and `agents/<name>.md` are generated fresh.
+- **Mapped, not copied.** Component dirs (`skills/`, `hooks/`, `scripts/`, `bin/`, `commands/`) and the agent's `mcp.json` (materialized as the backend dotfile `.mcp.json`) are symlinked back to the agent directory so edits stay in sync without duplication; on platforms/filesystems without symlink support kman falls back to a recursive copy. The manifest and `agents/<name>.md` are generated fresh.
 - **Rebuilt every launch.** The per-layout directory is removed and recreated on each spawn, so removed skills/hooks never linger as stale entries. The directory is derived state and safe to delete at any time. `kman agent rename` / `delete` drop the matching `~/.kman/runtime/<name>/` tree.
 - **Loaded via `--plugin-dir`.** The backend points `--plugin-dir` at `~/.kman/runtime/<name>/.claude` (claude-code) or `.copilot` (copilot-cli).
 
@@ -221,9 +221,9 @@ extra_args = ["--include-partial-messages"]
 extra_args = ["--some-native-flag"]
 ```
 
-### 5.2 `~/.kman/agents/<name>/.mcp.json`
+### 5.2 `~/.kman/agents/<name>/mcp.json`
 
-Standard Claude Code plugin MCP configuration:
+Standard Claude Code plugin MCP configuration (materialized as `.mcp.json` inside the runtime plugin at launch, §4.1):
 
 ```json
 {
@@ -241,9 +241,9 @@ Standard Claude Code plugin MCP configuration:
 }
 ```
 
-`.mcp.json` is loaded by the backend through its Claude Code plugin support. If the backend does not support MCP servers, the file is ignored.
+`mcp.json` is loaded by the backend through its Claude Code plugin support. If the backend does not support MCP servers, the file is ignored.
 
-If `.mcp.json` references an invalid server or command shape, kman exits with code 2 before spawning the backend.
+If `mcp.json` references an invalid server or command shape, kman exits with code 2 before spawning the backend.
 
 ### 5.3 `~/.kman/agents/<name>/hooks/hooks.json`
 
@@ -324,7 +324,7 @@ kman agent delete coder [--yes]
 kman agent rename coder reviewer
 ```
 
-`kman agent create` scaffolds an agent directory with **agent data only** (`agent.toml`, `soul.md` with its `name:` frontmatter, `skills/`, `hooks/`, `scripts/`, `.mcp.json`). It does **not** write plugin scaffolding — `.claude-plugin/plugin.json`, `plugin.json`, and `agents/<name>.md` are derived at launch under `~/.kman/runtime/<name>/` (§4.1). `agent delete` / `agent rename` also drop the matching runtime directory.
+`kman agent create` scaffolds an agent directory with **agent data only** (`agent.toml`, `soul.md` with its `name:` frontmatter, `skills/`, `hooks/`, `scripts/`, `mcp.json`). It does **not** write plugin scaffolding — `.claude-plugin/plugin.json`, `plugin.json`, and `agents/<name>.md` are derived at launch under `~/.kman/runtime/<name>/` (§4.1). `agent delete` / `agent rename` also drop the matching runtime directory.
 
 ### 6.2 Skills
 
@@ -345,7 +345,7 @@ kman skills remove --agent coder --skill humanizer
 
 kman does not provide `mcp` or `hook` subcommands. Users edit agent files directly:
 
-- `~/.kman/agents/<name>/.mcp.json` for per-agent MCP servers.
+- `~/.kman/agents/<name>/mcp.json` for per-agent MCP servers.
 - `~/.kman/agents/<name>/hooks/hooks.json` for hook configuration.
 - `~/.kman/agents/<name>/scripts/` for hook / utility scripts referenced by `hooks.json`.
 
@@ -524,7 +524,7 @@ Compiled binaries, OS package managers, and container images are deferred — se
 |---|---|---|
 | **M1 — walking skeleton** | Monorepo bootstrapped. `kman --help` / `kman version` work. `kman agent create/list/show/delete/rename` round-trip on disk. | `bun run kman agent create foo && bun run kman agent list` round-trips. |
 | **M2 — single backend** | Claude-code adapter only. `kman run` and `kman chat` work end-to-end; backend stdout/stderr passes through unchanged. Soul prompt injected as append-system-prompt; agent directory loaded via `--plugin-dir`. | `kman run --agent foo --task "say hi"` returns assistant text. `--runtime-flag --continue` resumes the backend's native session. |
-| **M3 — plugin ecosystem** | `skills add/list/show/update/remove` for local, git, GitHub/GitLab, and well-known sources, with `--ref` pinning and interactive multi-select. Hand-edited `.mcp.json` and `hooks/hooks.json` load through the plugin during runs. | A `skills add` from a multi-skill source installs the user-selected subset; a hand-written hook fires during `kman run`. |
+| **M3 — plugin ecosystem** | `skills add/list/show/update/remove` for local, git, GitHub/GitLab, and well-known sources, with `--ref` pinning and interactive multi-select. Hand-edited `mcp.json` and `hooks/hooks.json` load through the plugin during runs. | A `skills add` from a multi-skill source installs the user-selected subset; a hand-written hook fires during `kman run`. |
 | **M4 — backend parity** | Copilot CLI adapter. Permission abstraction mapping across both backends. `--runtime` flag works. | The same agent profile runs through both v1 backends (modulo declared capability gaps). |
 | **M5 — polish** | Bug-fix pass, docs, examples, error-message quality, npm publish pipeline. | `bun install -g @kman/cli` from a clean machine yields a working `kman` end-to-end. |
 
@@ -532,7 +532,7 @@ Compiled binaries, OS package managers, and container images are deferred — se
 
 - **Session layer.** Unified session capture, listing, search, export, prune, and cross-backend resume. v1 uses backend-native sessions only.
 - ~~**Agent-to-agent invocation.**~~ Shipped — see §3.4. Generic `kman_run_agent` tool plus `kman mcp install` for external runtime registration; cycle and depth protection via `KMAN_RUN_CHAIN`. Per-agent tool variants (`kman_agent_<name>`) and long-lived HTTP transport remain follow-ups.
-- **`kman doctor` deepening.** v1 ships a baseline `doctor` (backend binaries + version, `.mcp.json` JSON validity, hook script presence/executability, `bin/` shadowing warning, agent profile sanity). Deferred extensions: `userConfig` ↔ launch-env reconciliation, deeper `.mcp.json` semantic validation, and `claude plugin validate` integration.
+- **`kman doctor` deepening.** v1 ships a baseline `doctor` (backend binaries + version, `mcp.json` JSON validity, hook script presence/executability, `bin/` shadowing warning, agent profile sanity). Deferred extensions: `userConfig` ↔ launch-env reconciliation, deeper `mcp.json` semantic validation, and `claude plugin validate` integration.
 - **Standalone distribution.** Compiled single-file binaries via `bun build --compile` for macOS / Linux / Windows; Homebrew tap, Scoop bucket, AUR; Docker images for CI / serverless.
 - **Codex and Gemini adapters.**
 - **Workflow DSL.**

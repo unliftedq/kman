@@ -66,11 +66,13 @@ describe('attachKmanMcp', () => {
     expect(augmented.extraArgs.slice(2)).toEqual(['--my-flag', 'value']);
   });
 
-  it('uses --additional-mcp-config for copilot-cli', async () => {
+  it('uses --additional-mcp-config with @-prefixed file path for copilot-cli', async () => {
     const ctx = makeCtx('coder', [], 'copilot-cli');
     const augmented = await attachKmanMcp(ctx);
     expect(augmented.extraArgs[0]).toBe('--additional-mcp-config');
-    expect(augmented.extraArgs[1]).toMatch(/mcp-config\.json$/);
+    // copilot-cli reads a file only when the path is prefixed with `@`; a bare
+    // value is parsed as inline JSON.
+    expect(augmented.extraArgs[1]).toMatch(/^@.*mcp-config\.json$/);
   });
 
   it('skips injection for unknown backends rather than breaking the launch', async () => {

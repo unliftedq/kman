@@ -62,7 +62,7 @@ kman agent delete <name> [--yes]
 
 - `soul.md` — the agent's system prompt, with a `name:` frontmatter (edit this).
 - `agent.toml` — kman profile (default backend, model, permissions).
-- `skills/`, `hooks/`, `scripts/`, `.mcp.json` — empty scaffolding for per-agent extensions.
+- `skills/`, `hooks/`, `scripts/`, `mcp.json` — empty scaffolding for per-agent extensions.
 
 No plugin files are written into the agent directory. At launch kman materializes a runtime-native plugin (name fixed to `kman`) under `~/.kman/runtime/<name>/.claude` or `.copilot` and points the backend at it; that directory is derived state, rebuilt on each run, and removed by `agent delete` / `agent rename`.
 

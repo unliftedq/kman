@@ -83,18 +83,18 @@ async function checkSoul(profile: Profile): Promise<Check> {
 }
 
 async function checkMcpJson(agent: string): Promise<Check[]> {
-  const path = join(agentDir(agent), '.mcp.json');
+  const path = join(agentDir(agent), 'mcp.json');
   let exists: boolean;
   try {
     exists = await pathExists(path);
   } catch (err) {
-    return [{ id: 'mcp.present', label: '.mcp.json', severity: 'error', message: (err as Error).message }];
+    return [{ id: 'mcp.present', label: 'mcp.json', severity: 'error', message: (err as Error).message }];
   }
   if (!exists) {
     return [
       {
         id: 'mcp.present',
-        label: '.mcp.json',
+        label: 'mcp.json',
         severity: 'info',
         message: 'not present; MCP servers disabled for this agent.',
       },
@@ -104,7 +104,7 @@ async function checkMcpJson(agent: string): Promise<Check[]> {
   try {
     raw = await readFile(path, 'utf8');
   } catch (err) {
-    return [{ id: 'mcp.readable', label: '.mcp.json', severity: 'error', message: (err as Error).message }];
+    return [{ id: 'mcp.readable', label: 'mcp.json', severity: 'error', message: (err as Error).message }];
   }
   let parsed: unknown;
   try {
@@ -113,7 +113,7 @@ async function checkMcpJson(agent: string): Promise<Check[]> {
     return [
       {
         id: 'mcp.json',
-        label: '.mcp.json',
+        label: 'mcp.json',
         severity: 'error',
         message: `invalid JSON: ${(err as Error).message}`,
         detail: `Edit ${path} and ensure it is valid JSON.`,
@@ -121,14 +121,14 @@ async function checkMcpJson(agent: string): Promise<Check[]> {
     ];
   }
   if (typeof parsed !== 'object' || parsed === null) {
-    return [{ id: 'mcp.shape', label: '.mcp.json', severity: 'error', message: 'top-level value must be an object.' }];
+    return [{ id: 'mcp.shape', label: 'mcp.json', severity: 'error', message: 'top-level value must be an object.' }];
   }
   const servers = (parsed as Record<string, unknown>)['mcpServers'];
   const checks: Check[] = [];
   if (typeof servers !== 'object' || servers === null || Array.isArray(servers)) {
     checks.push({
       id: 'mcp.shape',
-      label: '.mcp.json',
+      label: 'mcp.json',
       severity: 'error',
       message: 'missing "mcpServers" object.',
     });
@@ -136,7 +136,7 @@ async function checkMcpJson(agent: string): Promise<Check[]> {
   }
   const entries = Object.entries(servers as Record<string, unknown>);
   if (entries.length === 0) {
-    checks.push({ id: 'mcp.servers', label: '.mcp.json', severity: 'info', message: 'no MCP servers configured.' });
+    checks.push({ id: 'mcp.servers', label: 'mcp.json', severity: 'info', message: 'no MCP servers configured.' });
     return checks;
   }
 
@@ -165,7 +165,7 @@ async function checkMcpJson(agent: string): Promise<Check[]> {
   }
   checks.unshift({
     id: 'mcp.servers',
-    label: '.mcp.json',
+    label: 'mcp.json',
     severity: errors > 0 ? 'error' : 'ok',
     message: `${entries.length} server(s) declared${errors > 0 ? `, ${errors} invalid` : ''}.`,
   });

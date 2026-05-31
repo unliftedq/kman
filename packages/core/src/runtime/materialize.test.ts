@@ -42,7 +42,7 @@ describe('materializeRuntimePlugin', () => {
     await writeFile(join(dir, 'skills', 'humanizer', 'SKILL.md'), '# skill\n', 'utf8');
     await mkdir(join(dir, 'hooks'), { recursive: true });
     await writeFile(join(dir, 'hooks', 'hooks.json'), '{}\n', 'utf8');
-    await writeFile(join(dir, '.mcp.json'), '{"mcpServers":{}}\n', 'utf8');
+    await writeFile(join(dir, 'mcp.json'), '{"mcpServers":{}}\n', 'utf8');
     await writeFile(join(dir, 'soul.md'), '---\nname: coder\n---\n\nYou are coder.\n', 'utf8');
   });
 
@@ -69,6 +69,36 @@ describe('materializeRuntimePlugin', () => {
     const manifest = JSON.parse(await readFile(join(pluginDir, 'plugin.json'), 'utf8'));
     expect(manifest.name).toBe('kman');
     expect(manifest.agents).toBe('agents/');
+    expect(manifest.commands).toContain('kman-commands/');
+  });
+
+  test('copilot renders the workflow prompts as plugin commands', async () => {
+    // copilot does not surface MCP prompts, so the shared templates are
+    // materialized as `/list-agents`-style plugin commands instead.
+    const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'copilot');
+    const list = await readFile(join(pluginDir, 'kman-commands', 'list-agents.md'), 'utf8');
+    expect(list).toMatch(/^description:/m);
+    expect(list).toContain('kman_list_agents');
+
+    const delegate = await readFile(join(pluginDir, 'kman-commands', 'delegate-task.md'), 'utf8');
+    // Multi-arg prompts use positional substitution tokens.
+    expect(delegate).toContain('$1');
+    expect(delegate).toContain('$2');
+
+    const find = await readFile(join(pluginDir, 'kman-commands', 'find-agent.md'), 'utf8');
+    // Single-arg prompts use the free-form $ARGUMENTS token.
+    expect(find).toContain('$ARGUMENTS');
+  });
+
+  test('claude layout does not render prompt commands (MCP prompts cover it)', async () => {
+    const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'claude');
+    let present = true;
+    try {
+      await lstat(join(pluginDir, 'kman-commands'));
+    } catch {
+      present = false;
+    }
+    expect(present).toBe(false);
   });
 
   test('exposes the soul as agents/<name>.md', async () => {
@@ -78,12 +108,36 @@ describe('materializeRuntimePlugin', () => {
     expect(soul).toContain('You are coder.');
   });
 
-  test('maps component dirs and .mcp.json from the agent dir', async () => {
+  test('copilot exposes the soul as agents/<name>.agent.md with a description', async () => {
+    // copilot only recognizes `<name>.agent.md` files and drops agents whose
+    // frontmatter lacks a `description:`.
+    const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'copilot');
+    const soul = await readFile(join(pluginDir, 'agents', 'coder.agent.md'), 'utf8');
+    expect(soul).toContain('name: coder');
+    expect(soul).toMatch(/^description:/m);
+    expect(soul).toContain('You are coder.');
+  });
+
+  test('copilot keeps an existing description from the soul frontmatter', async () => {
+    await writeFile(
+      join(agentDir('coder'), 'soul.md'),
+      '---\nname: coder\ndescription: hand-written\n---\n\nYou are coder.\n',
+      'utf8',
+    );
+    const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'copilot');
+    const soul = await readFile(join(pluginDir, 'agents', 'coder.agent.md'), 'utf8');
+    expect(soul).toContain('description: hand-written');
+    // Description appears exactly once — not duplicated by the injection.
+    expect(soul.match(/^description:/gm)?.length).toBe(1);
+  });
+
+  test('maps component dirs and agent mcp.json to plugin .mcp.json', async () => {
     const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'claude');
     expect(await readFile(join(pluginDir, 'skills', 'humanizer', 'SKILL.md'), 'utf8')).toContain(
       '# skill',
     );
     expect(await readFile(join(pluginDir, 'hooks', 'hooks.json'), 'utf8')).toBe('{}\n');
+    // The agent keeps a plain `mcp.json`; the plugin gets the dotfile backends expect.
     expect(await readFile(join(pluginDir, '.mcp.json'), 'utf8')).toContain('mcpServers');
   });
 

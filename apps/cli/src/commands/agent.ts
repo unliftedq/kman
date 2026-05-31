@@ -63,7 +63,7 @@ export function buildAgentCommand(): Command {
       const soulContent = `---\nname: ${name}\n${descLine}---\n\n${soulBody}`;
       await writeFile(agentSoulPath(name, profile.soul.prompt_file), soulContent, 'utf8');
 
-      await writeFile(join(dir, '.mcp.json'), JSON.stringify({ mcpServers: {} }, null, 2) + '\n', 'utf8');
+      await writeFile(join(dir, 'mcp.json'), JSON.stringify({ mcpServers: {} }, null, 2) + '\n', 'utf8');
 
       process.stdout.write(`Created agent "${name}" at ${dir}\n`);
     });

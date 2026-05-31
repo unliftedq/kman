@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { cp, mkdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, dirname, join } from 'node:path';
 import type { BackendName, Profile } from '@kman/types';
 import { agentDir, agentSoulPath } from '../paths.js';
+import { promptCommandFiles } from '../mcp-prompts/index.js';
 import { KMAN_PLUGIN_NAME, runtimePluginDir, type PluginLayout } from './paths.js';
 
 /**
@@ -12,8 +13,21 @@ import { KMAN_PLUGIN_NAME, runtimePluginDir, type PluginLayout } from './paths.j
  */
 const LINKED_DIRS = ['skills', 'hooks', 'scripts', 'bin', 'commands'] as const;
 
-/** Component files mapped the same way as {@link LINKED_DIRS}. */
-const LINKED_FILES = ['.mcp.json'] as const;
+/**
+ * Component files exposed in the materialized plugin the same way as
+ * {@link LINKED_DIRS}. The source name (in the agent dir) may differ from the
+ * destination name (in the plugin): the agent keeps a plain `mcp.json`, but the
+ * backends expect the dotfile `.mcp.json`, so it is mapped on materialization.
+ */
+const LINKED_FILES = [{ from: 'mcp.json', to: '.mcp.json' }] as const;
+
+/**
+ * Directory (inside the materialized plugin) that holds the kman workflow
+ * commands generated from the shared prompt templates. Kept separate from the
+ * agent's own `commands/` (which is symlinked through via {@link LINKED_DIRS})
+ * so both can coexist; the copilot manifest references both paths.
+ */
+const KMAN_COMMANDS_DIR = 'kman-commands';
 
 export interface MaterializedPlugin {
   /** Absolute path the backend points `--plugin-dir` at. */
@@ -40,9 +54,9 @@ export function pluginLayoutForBackend(backend: BackendName): PluginLayout | und
  * plugin directory under ~/.kman/runtime/<name>/.{claude,copilot}.
  *
  * The plugin manifest and the contributed `agents/<name>.md` are generated
- * fresh; the user-owned component dirs and `.mcp.json` are symlinked back to
- * the agent directory (copied where symlinks are unavailable) so edits stay
- * in sync without duplicating data.
+ * fresh; the user-owned component dirs and `mcp.json` (mapped to `.mcp.json`)
+ * are symlinked back to the agent directory (copied where symlinks are
+ * unavailable) so edits stay in sync without duplicating data.
  *
  * To stay safe against concurrent launches of the same agent/backend, the
  * plugin is built in full inside a unique staging directory and then swapped
@@ -79,7 +93,7 @@ async function buildPlugin(
 ): Promise<void> {
   await mkdir(pluginDir, { recursive: true });
 
-  await writeManifest(pluginDir, profile, layout);
+  await writeManifest(pluginDir, src, profile, layout);
 
   // soul.md doubles as the plugin-contributed agent definition. Its YAML
   // frontmatter `name:` is what the backend registers the agent under, so the
@@ -88,7 +102,7 @@ async function buildPlugin(
   const soulPath = isAbsolute(soulFile) ? soulFile : agentSoulPath(profile.name, soulFile);
   await mkdir(join(pluginDir, 'agents'), { recursive: true });
   if (await pathExists(soulPath)) {
-    await linkOrCopy(soulPath, join(pluginDir, 'agents', `${profile.name}.md`), 'file');
+    await materializeAgentFile(soulPath, pluginDir, profile, layout);
   }
 
   for (const dir of LINKED_DIRS) {
@@ -98,11 +112,81 @@ async function buildPlugin(
     }
   }
   for (const file of LINKED_FILES) {
-    const from = join(src, file);
+    const from = join(src, file.from);
     if (await pathExists(from)) {
-      await linkOrCopy(from, join(pluginDir, file), 'file');
+      await linkOrCopy(from, join(pluginDir, file.to), 'file');
     }
   }
+
+  // copilot-cli does not surface MCP prompts, so render the shared workflow
+  // prompt templates as plugin commands (e.g. `/list-agents`) instead. claude
+  // already exposes the MCP prompts natively, so it needs none of this.
+  if (layout === 'copilot') {
+    await writePromptCommands(pluginDir);
+  }
+}
+
+/** Materialize the shared prompt templates as copilot plugin command files. */
+async function writePromptCommands(pluginDir: string): Promise<void> {
+  const dir = join(pluginDir, KMAN_COMMANDS_DIR);
+  await mkdir(dir, { recursive: true });
+  for (const cmd of promptCommandFiles()) {
+    await writeFile(join(dir, `${cmd.name}.md`), cmd.content, 'utf8');
+  }
+}
+
+
+/**
+ * Expose soul.md as the plugin's contributed agent definition.
+ *
+ * The two backends differ in what they require:
+ *  - claude-code registers `agents/<name>.md` and tolerates frontmatter that
+ *    carries only `name:`. We symlink the soul straight through so user edits
+ *    stay live.
+ *  - copilot-cli only recognizes agent files named `<name>.agent.md` and
+ *    silently drops any whose frontmatter lacks a `description:`. We therefore
+ *    read the soul, guarantee a `description:` line, and write a real file
+ *    (regenerated from scratch on every launch, so edits are still picked up
+ *    next time).
+ */
+async function materializeAgentFile(
+  soulPath: string,
+  pluginDir: string,
+  profile: Profile,
+  layout: PluginLayout,
+): Promise<void> {
+  const agentsDir = join(pluginDir, 'agents');
+
+  if (layout === 'claude') {
+    await linkOrCopy(soulPath, join(agentsDir, `${profile.name}.md`), 'file');
+    return;
+  }
+
+  const raw = await readFile(soulPath, 'utf8');
+  const content = ensureDescription(raw, profile);
+  await writeFile(join(agentsDir, `${profile.name}.agent.md`), content, 'utf8');
+}
+
+/**
+ * Ensure the soul's YAML frontmatter carries a `description:` (required by
+ * copilot-cli). If one is already present the content is returned unchanged;
+ * otherwise a description is inserted, sourced from the profile or derived from
+ * the agent name. Content without frontmatter gets a minimal block prepended.
+ */
+function ensureDescription(raw: string, profile: Profile): string {
+  const description = profile.description ?? `${profile.name} agent`;
+
+  if (!raw.startsWith('---\n')) {
+    return `---\nname: ${profile.name}\ndescription: ${description}\n---\n\n${raw}`;
+  }
+
+  const end = raw.indexOf('\n---', 4);
+  if (end < 0) return raw; // malformed frontmatter — leave untouched.
+
+  const frontmatter = raw.slice(0, end);
+  if (/^description:/m.test(frontmatter)) return raw;
+
+  return raw.replace(/^---\n/, `---\ndescription: ${description}\n`);
 }
 
 /**
@@ -143,6 +227,7 @@ async function swapIntoPlace(staging: string, pluginDir: string): Promise<void> 
 
 async function writeManifest(
   pluginDir: string,
+  src: string,
   profile: Profile,
   layout: PluginLayout,
 ): Promise<void> {
@@ -161,7 +246,16 @@ async function writeManifest(
     return;
   }
 
-  const manifest: Record<string, unknown> = { name: KMAN_PLUGIN_NAME, agents: 'agents/' };
+  // Register both the kman-generated workflow commands and, when present, the
+  // agent's own `commands/` directory (symlinked through separately).
+  const commands = [`${KMAN_COMMANDS_DIR}/`];
+  if (await pathExists(join(src, 'commands'))) commands.unshift('commands/');
+
+  const manifest: Record<string, unknown> = {
+    name: KMAN_PLUGIN_NAME,
+    agents: 'agents/',
+    commands,
+  };
   if (profile.description) manifest['description'] = profile.description;
   await writeFile(join(pluginDir, 'plugin.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 }
