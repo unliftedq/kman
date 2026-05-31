@@ -17,19 +17,42 @@ export function parseConfig(raw: unknown): KmanConfig {
   }
 
   const partial: Partial<ConfigDefaults> = {};
-  if (typeof defaultsRaw['runtime'] === 'string') partial.runtime = defaultsRaw['runtime'] as string;
-  if (typeof defaultsRaw['model'] === 'string') partial.model = defaultsRaw['model'] as string;
-  if (typeof defaultsRaw['permission_mode'] === 'string') {
+  if (assertType(defaultsRaw, 'runtime', 'string')) partial.runtime = defaultsRaw['runtime'] as string;
+  if (assertType(defaultsRaw, 'model', 'string')) partial.model = defaultsRaw['model'] as string;
+  if (assertType(defaultsRaw, 'permission_mode', 'string')) {
     partial.permission_mode = defaultsRaw['permission_mode'] as ConfigDefaults['permission_mode'];
   }
-  if (typeof defaultsRaw['output_format'] === 'string') {
+  if (assertType(defaultsRaw, 'output_format', 'string')) {
     partial.output_format = defaultsRaw['output_format'] as ConfigDefaults['output_format'];
   }
-  if (typeof defaultsRaw['max_turns'] === 'number') partial.max_turns = defaultsRaw['max_turns'] as number;
+  if (assertType(defaultsRaw, 'max_turns', 'number')) partial.max_turns = defaultsRaw['max_turns'] as number;
 
   const config = mergeConfig({ defaults: partial as ConfigDefaults });
   validateConfig(config);
   return config;
+}
+
+/**
+ * Reject a known config key that is present but has the wrong JSON type. A
+ * hand-edited mistake like `{ "defaults": { "max_turns": "20" } }` must fail
+ * loudly rather than be silently dropped and replaced by a built-in default.
+ * Returns `true` when the key carries a usable value of the expected type;
+ * `null`/`undefined` is treated as "unset" (returns `false`) and left to the
+ * defaults.
+ */
+function assertType(
+  defaults: Record<string, unknown>,
+  key: string,
+  expected: 'string' | 'number',
+): boolean {
+  const value = defaults[key];
+  if (value === undefined || value === null) return false;
+  if (typeof value !== expected) {
+    throw new UserError(
+      `config.json: defaults.${key} must be a ${expected}, got ${typeof value}.`,
+    );
+  }
+  return true;
 }
 
 /**

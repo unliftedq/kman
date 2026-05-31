@@ -18,8 +18,13 @@ const LINKED_DIRS = ['skills', 'hooks', 'scripts', 'bin', 'commands'] as const;
  * {@link LINKED_DIRS}. The source name (in the agent dir) may differ from the
  * destination name (in the plugin): the agent keeps a plain `mcp.json`, but the
  * backends expect the dotfile `.mcp.json`, so it is mapped on materialization.
+ *
+ * `legacyFrom` names an older source filename kept for backward compatibility:
+ * agents scaffolded by earlier versions stored their MCP config directly as
+ * `.mcp.json`, so it is used as a fallback when the current `mcp.json` is
+ * absent.
  */
-const LINKED_FILES = [{ from: 'mcp.json', to: '.mcp.json' }] as const;
+const LINKED_FILES = [{ from: 'mcp.json', legacyFrom: '.mcp.json', to: '.mcp.json' }] as const;
 
 /**
  * Directory (inside the materialized plugin) that holds the kman workflow
@@ -112,7 +117,11 @@ async function buildPlugin(
     }
   }
   for (const file of LINKED_FILES) {
-    const from = join(src, file.from);
+    let from = join(src, file.from);
+    if (!(await pathExists(from)) && file.legacyFrom) {
+      const legacy = join(src, file.legacyFrom);
+      if (await pathExists(legacy)) from = legacy;
+    }
     if (await pathExists(from)) {
       await linkOrCopy(from, join(pluginDir, file.to), 'file');
     }

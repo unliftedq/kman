@@ -90,6 +90,21 @@ async function checkMcpJson(agent: string): Promise<Check[]> {
   } catch (err) {
     return [{ id: 'mcp.present', label: 'mcp.json', severity: 'error', message: (err as Error).message }];
   }
+  // Agents scaffolded by earlier versions kept their MCP config as the dotfile
+  // `.mcp.json`; the materializer still honors it, so fall back to it here so a
+  // legacy agent's MCP config keeps being checked rather than reported absent.
+  let resolved = path;
+  if (!exists) {
+    const legacy = join(agentDir(agent), '.mcp.json');
+    try {
+      if (await pathExists(legacy)) {
+        exists = true;
+        resolved = legacy;
+      }
+    } catch (err) {
+      return [{ id: 'mcp.present', label: 'mcp.json', severity: 'error', message: (err as Error).message }];
+    }
+  }
   if (!exists) {
     return [
       {
@@ -102,7 +117,7 @@ async function checkMcpJson(agent: string): Promise<Check[]> {
   }
   let raw: string;
   try {
-    raw = await readFile(path, 'utf8');
+    raw = await readFile(resolved, 'utf8');
   } catch (err) {
     return [{ id: 'mcp.readable', label: 'mcp.json', severity: 'error', message: (err as Error).message }];
   }
@@ -116,7 +131,7 @@ async function checkMcpJson(agent: string): Promise<Check[]> {
         label: 'mcp.json',
         severity: 'error',
         message: `invalid JSON: ${(err as Error).message}`,
-        detail: `Edit ${path} and ensure it is valid JSON.`,
+        detail: `Edit ${resolved} and ensure it is valid JSON.`,
       },
     ];
   }

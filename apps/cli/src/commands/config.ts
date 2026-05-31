@@ -8,6 +8,7 @@ import {
   writeConfig,
 } from '@kman/core';
 import { type KmanConfig, UserError } from '@kman/types';
+import { rejectAgent } from '../common/agent-option.js';
 
 /** Keys settable via `kman config set`, mapped to their parse/validate logic. */
 const SETTABLE_KEYS = [
@@ -29,6 +30,7 @@ export function buildConfigCommand(): Command {
     .description('Print the effective configuration (built-in defaults merged with config.json).')
     .option('--json', 'Emit the configuration as JSON.')
     .action(async (opts: { json?: boolean }) => {
+      rejectAgent('config show');
       const config = await readConfig();
       if (opts.json) {
         process.stdout.write(JSON.stringify(config, null, 2) + '\n');
@@ -51,6 +53,7 @@ export function buildConfigCommand(): Command {
     .command('path')
     .description('Print the path to config.json.')
     .action(() => {
+      rejectAgent('config path');
       process.stdout.write(`${configPath()}\n`);
     });
 
@@ -58,6 +61,7 @@ export function buildConfigCommand(): Command {
     .command('get <key>')
     .description(`Print a single value. Keys: ${SETTABLE_KEYS.join(', ')}.`)
     .action(async (key: string) => {
+      rejectAgent('config get');
       const config = await readConfig();
       const value = readKey(config, assertSettableKey(key));
       process.stdout.write(value === undefined ? '(unset)\n' : `${value}\n`);
@@ -67,6 +71,7 @@ export function buildConfigCommand(): Command {
     .command('set <key> <value>')
     .description(`Set a value and write it to config.json. Keys: ${SETTABLE_KEYS.join(', ')}.`)
     .action(async (key: string, value: string) => {
+      rejectAgent('config set');
       const config = await readConfig();
       const next = applyKey(config, assertSettableKey(key), value);
       validateConfig(next);
@@ -78,6 +83,7 @@ export function buildConfigCommand(): Command {
     .command('unset <key>')
     .description(`Remove a value (reverts to the built-in default). Keys: ${SETTABLE_KEYS.join(', ')}.`)
     .action(async (key: string) => {
+      rejectAgent('config unset');
       const k = assertSettableKey(key);
       if (k === 'defaults.runtime') {
         throw new UserError('defaults.runtime cannot be unset; set it to claude-code or copilot-cli instead.');

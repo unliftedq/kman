@@ -39,6 +39,11 @@ export function buildAgentCommand(): Command {
         throw new UserError(`Agent "${name}" already exists at ${dir}.`);
       }
 
+      // Read and validate the global config.json *before* creating any files:
+      // readConfig() can throw (e.g. malformed config.json), and we must not
+      // leave a half-created agent directory behind that blocks future creates.
+      const config = await readConfig();
+
       await mkdir(dir, { recursive: true });
       await mkdir(join(dir, 'skills'), { recursive: true });
       await mkdir(join(dir, 'hooks'), { recursive: true });
@@ -46,7 +51,6 @@ export function buildAgentCommand(): Command {
 
       // Seed unspecified fields from the global config.json so a user who lives
       // on one backend doesn't have to repeat --runtime on every create.
-      const config = await readConfig();
       const runtime = opts.runtime ?? config.defaults.runtime;
       const model = opts.model ?? config.defaults.model;
 

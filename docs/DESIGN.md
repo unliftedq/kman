@@ -27,7 +27,7 @@ Long-term, the same core powers a desktop app, a web UI, and a remote gateway. v
 - **No skill template system.** New agents start with an empty skills directory.
 - **No shell / HTTP custom tools.** v1 only wires MCP tools through `mcp.json`. Shell / HTTP tool adapters need a separate schema, timeout, quoting, and safety design.
 - **No Codex / Gemini adapters in v1.** v1 implements `claude-code` and `copilot-cli` first.
-- **No config command in v1.** Global configuration commands are deferred until concrete global settings exist.
+- ~~**No config command in v1.**~~ As of v1, `kman config` ships to view and edit the roster-wide defaults in `~/.kman/config.json` (§4.2, §6.1.1).
 - **No compiled binary distribution in v1.** v1 ships as an npm package consumed via `bun install -g @kman/cli`. Single-file native binaries (Bun `--compile`), Homebrew / Scoop / AUR packaging, and Docker images are [TODO](#10-roadmap).
 
 ---
@@ -181,13 +181,13 @@ Plugin layout is a *backend implementation detail*, not agent data — so kman k
   │   └── .mcp.json                  #   → agent dir (mcp.json)
   └── .copilot/                      # complete Copilot plugin (copilot-cli)
     ├── plugin.json                  #   { "name": "kman", "agents": "agents/" }
-    ├── agents/coder.md              #   → soul.md
+    ├── agents/coder.agent.md        #   → soul.md (regenerated; copilot-cli requires the .agent.md suffix + a description:)
     ├── skills/ hooks/ scripts/ bin/ commands/
     └── .mcp.json
 ```
 
 - **Fixed plugin name.** Every materialized plugin declares `"name": "kman"`, so the backend selector is always `kman:<agent>` (`--agent kman:coder`). The contributed agent's own name comes from `soul.md`'s YAML frontmatter `name:`.
-- **Mapped, not copied.** Component dirs (`skills/`, `hooks/`, `scripts/`, `bin/`, `commands/`) and the agent's `mcp.json` (materialized as the backend dotfile `.mcp.json`) are symlinked back to the agent directory so edits stay in sync without duplication; on platforms/filesystems without symlink support kman falls back to a recursive copy. The manifest and `agents/<name>.md` are generated fresh.
+- **Mapped, not copied.** Component dirs (`skills/`, `hooks/`, `scripts/`, `bin/`, `commands/`) and the agent's `mcp.json` (materialized as the backend dotfile `.mcp.json`) are symlinked back to the agent directory so edits stay in sync without duplication; on platforms/filesystems without symlink support kman falls back to a recursive copy. The manifest and the contributed agent file are generated fresh; the agent filename is backend-specific — `agents/<name>.md` for claude-code, `agents/<name>.agent.md` for copilot-cli.
 - **Rebuilt every launch.** The per-layout directory is removed and recreated on each spawn, so removed skills/hooks never linger as stale entries. The directory is derived state and safe to delete at any time. `kman agent rename` / `delete` drop the matching `~/.kman/runtime/<name>/` tree.
 - **Loaded via `--plugin-dir`.** The backend points `--plugin-dir` at `~/.kman/runtime/<name>/.claude` (claude-code) or `.copilot` (copilot-cli).
 
