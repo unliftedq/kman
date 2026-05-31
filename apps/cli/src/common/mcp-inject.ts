@@ -20,8 +20,8 @@ import { isKmanInstalledIn, mcpServerInvocation } from '../commands/mcp.js';
 export async function attachKmanMcp(ctx: AgentContext): Promise<AgentContext> {
   if (process.env['KMAN_NO_MCP'] === '1') return ctx;
 
-  const flag = mcpConfigFlagFor(ctx.backend);
-  if (!flag) return ctx; // unknown backend — fail open rather than block the run
+  const flagSpec = mcpConfigFlagFor(ctx.backend);
+  if (!flagSpec) return ctx; // unknown backend — fail open rather than block the run
 
   // If the user already opted in via `kman mcp install`, the backend has
   // `kman` in its user-scope config. Adding the same key via `--mcp-config`
@@ -55,13 +55,25 @@ export async function attachKmanMcp(ctx: AgentContext): Promise<AgentContext> {
   const inv = mcpServerInvocation();
   const configPath = await ensureInjectionConfig({ kmanCommand: inv.command, kmanBaseArgs: inv.baseArgs });
 
+  // copilot-cli's --additional-mcp-config treats a bare value as inline JSON
+  // and only reads a file when the path is prefixed with `@`. claude-code's
+  // --mcp-config takes the path directly.
+  const configArg = flagSpec.pathPrefix ? `${flagSpec.pathPrefix}${configPath}` : configPath;
+
   return {
     ...ctx,
     // The MCP-config flag goes *before* user extra args so users can still
     // override or extend with their own flags downstream.
-    extraArgs: [flag, configPath, ...ctx.extraArgs],
+    extraArgs: [flagSpec.flag, configArg, ...ctx.extraArgs],
     env,
   };
+}
+
+interface McpConfigFlagSpec {
+  /** The flag the backend accepts for adding an MCP config. */
+  flag: string;
+  /** Prefix required before the file path (e.g. `@` for copilot-cli). */
+  pathPrefix?: string;
 }
 
 /**
@@ -69,12 +81,12 @@ export async function attachKmanMcp(ctx: AgentContext): Promise<AgentContext> {
  * without going through plugin wrapping. Returns undefined for unknown
  * backends so we skip injection rather than break the launch.
  */
-function mcpConfigFlagFor(backend: BackendName): string | undefined {
+function mcpConfigFlagFor(backend: BackendName): McpConfigFlagSpec | undefined {
   switch (backend) {
     case 'claude-code':
-      return '--mcp-config';
+      return { flag: '--mcp-config' };
     case 'copilot-cli':
-      return '--additional-mcp-config';
+      return { flag: '--additional-mcp-config', pathPrefix: '@' };
     default:
       return undefined;
   }

@@ -77,7 +77,7 @@ export function buildMcpCommand(): Command {
     .option('--self <name>', 'Hide this agent from listings (used by kman during auto-injection).')
     .option(
       '--self-from-env',
-      "Read the agent name to hide from the KMAN_SELF_AGENT env var. Used by the injected plugin so a single on-disk .mcp.json works for every agent.",
+      "Read the agent name to hide from the KMAN_SELF_AGENT env var. Used by the injected plugin so a single on-disk MCP config works for every agent.",
     )
     .option('--run-timeout <ms>', 'Per-tool-call timeout in milliseconds (default 600000, 0 disables).', (v) =>
       Number.parseInt(v, 10),

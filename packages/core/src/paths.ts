@@ -11,6 +11,11 @@ export function agentsRoot(): string {
   return join(kmanHome(), 'agents');
 }
 
+/** Global kman configuration file (§4). */
+export function configPath(): string {
+  return join(kmanHome(), 'config.json');
+}
+
 export function agentDir(name: string): string {
   return join(agentsRoot(), name);
 }

@@ -4,6 +4,7 @@ import pkg from '../package.json' with { type: 'json' };
 import { buildAgentCommand } from './commands/agent.js';
 import { buildSkillsCommand } from './commands/skills.js';
 import { buildRunCommand } from './commands/run.js';
+import { buildConfigCommand } from './commands/config.js';
 import { buildChatCommand } from './commands/chat.js';
 import { buildVersionCommand } from './commands/version.js';
 import { buildDoctorCommand } from './commands/doctor.js';
@@ -48,6 +49,7 @@ program.option('-a, --agent <name>', 'Target agent name (lowercase kebab-case). 
 
 program.addCommand(buildAgentCommand());
 program.addCommand(buildSkillsCommand());
+program.addCommand(buildConfigCommand());
 program.addCommand(buildRunCommand());
 program.addCommand(buildChatCommand());
 program.addCommand(buildVersionCommand());

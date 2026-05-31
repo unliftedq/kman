@@ -28,7 +28,7 @@
 
 - `soul.md`：角色与行为约束（系统提示词）
 - `agent.toml`：运行时配置（后端、模型、权限等）
-- `skills/`、`hooks/`、`.mcp.json` 等扩展位
+- `skills/`、`hooks/`、`mcp.json` 等扩展位
 
 `kman` 会把 `kman -a <name> run ...` 或 `kman -a <name> chat` 转换成目标后端可识别的调用方式，并以后端原生机制注入 soul prompt。
 
