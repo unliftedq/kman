@@ -37,7 +37,7 @@ const KMAN_COMMANDS_DIR = 'kman-commands';
 export interface MaterializedPlugin {
   /** Absolute path the backend points `--plugin-dir` at. */
   readonly pluginDir: string;
-  /** `<plugin>:<agent>` selector for the backend's `--agent` flag. */
+  /** Selector for the backend's `--agent` flag. */
   readonly pluginAgent: string;
 }
 
@@ -86,7 +86,10 @@ export async function materializeRuntimePlugin(
     throw err;
   }
 
-  return { pluginDir, pluginAgent: `${KMAN_PLUGIN_NAME}:${profile.name}` };
+  return {
+    pluginDir,
+    pluginAgent: `${KMAN_PLUGIN_NAME}:${profile.name}`,
+  };
 }
 
 /** Build a complete plugin tree under `pluginDir` (expected to be a staging dir). */
@@ -101,8 +104,9 @@ async function buildPlugin(
   await writeManifest(pluginDir, src, profile, layout);
 
   // soul.md doubles as the plugin-contributed agent definition. Its YAML
-  // frontmatter `name:` is what the backend registers the agent under, so the
-  // selector resolves to `kman:<name>`.
+  // frontmatter `name:` is what the backend registers the agent under. The
+  // materialized plugin name is fixed to `kman`, so backends resolve the scoped
+  // selector as `kman:<name>`.
   const soulFile = profile.soul.prompt_file;
   const soulPath = isAbsolute(soulFile) ? soulFile : agentSoulPath(profile.name, soulFile);
   await mkdir(join(pluginDir, 'agents'), { recursive: true });
@@ -183,7 +187,7 @@ async function materializeAgentFile(
  * the agent name. Content without frontmatter gets a minimal block prepended.
  */
 function ensureDescription(raw: string, profile: Profile): string {
-  const description = profile.description ?? `${profile.name} agent`;
+  const description = quoteYamlString(profile.description ?? `${profile.name} agent`);
 
   if (!raw.startsWith('---\n')) {
     return `---\nname: ${profile.name}\ndescription: ${description}\n---\n\n${raw}`;
@@ -193,9 +197,25 @@ function ensureDescription(raw: string, profile: Profile): string {
   if (end < 0) return raw; // malformed frontmatter — leave untouched.
 
   const frontmatter = raw.slice(0, end);
-  if (/^description:/m.test(frontmatter)) return raw;
+  const existingDescription = /^description:\s*(.*)$/m.exec(frontmatter);
+  if (existingDescription) {
+    const value = existingDescription[1] ?? '';
+    if (isYamlQuotedOrBlockScalar(value)) return raw;
+    return raw.replace(/^description:\s*(.*)$/m, (_line, value: string) => {
+      return `description: ${quoteYamlString(value.trim())}`;
+    });
+  }
 
   return raw.replace(/^---\n/, `---\ndescription: ${description}\n`);
+}
+
+function quoteYamlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function isYamlQuotedOrBlockScalar(value: string): boolean {
+  const trimmed = value.trimStart();
+  return trimmed.startsWith('"') || trimmed.startsWith("'") || trimmed.startsWith('|') || trimmed.startsWith('>');
 }
 
 /**
@@ -216,7 +236,14 @@ async function swapIntoPlace(staging: string, pluginDir: string): Promise<void> 
       await rename(pluginDir, trash);
       movedAside = true;
     } catch (cause) {
-      if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause;
+      const code = (cause as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        // Nothing currently occupies the slot.
+      } else if (isRetriableSwapError(code)) {
+        continue;
+      } else {
+        throw cause;
+      }
     }
     try {
       await rename(staging, pluginDir);
@@ -225,13 +252,21 @@ async function swapIntoPlace(staging: string, pluginDir: string): Promise<void> 
       // A concurrent launch slotted its own plugin in after we cleared the
       // slot. Retry: move the newcomer aside and try to claim it again.
       const code = (cause as NodeJS.ErrnoException).code;
-      if (code === 'ENOTEMPTY' || code === 'EEXIST') continue;
+      if (isRetriableSwapError(code)) continue;
       throw cause;
     }
     if (movedAside) await rm(trash, { recursive: true, force: true }).catch(() => {});
     return;
   }
   throw new Error(`materializeRuntimePlugin: could not swap ${staging} into ${pluginDir}`);
+}
+
+function isRetriableSwapError(code: string | undefined): boolean {
+  return (
+    code === 'ENOTEMPTY' ||
+    code === 'EEXIST' ||
+    (process.platform === 'win32' && code === 'EPERM')
+  );
 }
 
 async function writeManifest(
