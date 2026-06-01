@@ -79,7 +79,7 @@ export function buildAgentCommand(): Command {
       // plugin under ~/.kman/runtime/<name>/ and exposes soul.md as the
       // contributed `agents/<name>.md`. The agent directory itself stays free of
       // plugin scaffolding. `description:` is only written when supplied.
-      const descLine = opts.description ? `description: ${opts.description}\n` : '';
+      const descLine = opts.description ? `description: ${quoteYamlString(opts.description)}\n` : '';
       const soulContent = `---\nname: ${name}\n${descLine}---\n\n${soulBody}`;
       await writeFile(agentSoulPath(name, profile.soul.prompt_file), soulContent, 'utf8');
 
@@ -188,8 +188,8 @@ export function buildAgentCommand(): Command {
       await writeProfile({ ...profile, name: to });
 
       // soul.md's frontmatter `name:` is what the runtime plugin registers the
-      // agent under (and what backends resolve via --agent kman:<to>). Drift
-      // here means the selector fails. Rewrite the frontmatter so it agrees.
+      // agent under. Drift here means backend selectors fail, so rewrite the
+      // frontmatter to agree with the renamed profile.
       await rewriteSoulFrontmatterName(join(dst, profile.soul.prompt_file), to);
 
       // Derived runtime plugin dirs are keyed by agent name; drop the stale
@@ -201,6 +201,10 @@ export function buildAgentCommand(): Command {
     });
 
   return cmd;
+}
+
+function quoteYamlString(value: string): string {
+  return JSON.stringify(value);
 }
 
 async function pathExists(p: string): Promise<boolean> {

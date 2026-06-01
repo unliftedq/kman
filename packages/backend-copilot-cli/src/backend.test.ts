@@ -68,7 +68,7 @@ describe('CopilotCliBackend argv construction (run mode)', () => {
     expect(args[args.indexOf('--plugin-dir') + 1]).toBe('/tmp/runtime/coder/.copilot');
   });
 
-  test('emits --agent <name>:<name> — the scoped form copilot requires for plugin agents', () => {
+  test('emits --agent <plugin>:<name> using Copilot\'s plugin-scoped selector', () => {
     const b = new CopilotCliBackend();
     const args = argsFor(b, mkCtx(), false);
     const idx = args.indexOf('--agent');

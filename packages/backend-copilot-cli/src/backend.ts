@@ -15,8 +15,8 @@ import type {
  *
  * Real flag surface (verified against `copilot --help`, 1.0.55):
  *   --plugin-dir <dir>      load a plugin directory (manifest at plugin.json)
- *   --agent <name>          select a custom agent — `<plugin>:<agent>` form
- *                           is required for plugin-contributed agents
+ *   --agent <name>          select a custom agent — plugin agents are exposed
+ *                           as `<plugin>:<agent>`
  *   --model <id>            override model
  *   -p, --prompt <text>     non-interactive prompt
  *   --output-format <fmt>   text | json (json is JSONL)
@@ -27,8 +27,7 @@ import type {
  * Soul prompt: delivered as a plugin-contributed agent. kman materializes a
  * runtime plugin under ~/.kman/runtime/<name>/.copilot whose `plugin.json`
  * declares `"agents": "agents/"` and a fixed plugin name `kman`; the soul lives
- * at `agents/<name>.md`, and we invoke `--agent kman:<name>` (copilot rejects
- * the bare name for plugin agents — the scoped form is mandatory).
+ * at `agents/<name>.agent.md`, and we invoke `--agent kman:<name>`.
  */
 const PERMISSION_FLAG: Record<PermissionLevel, string | null> = {
   ask: null,
@@ -75,8 +74,8 @@ export class CopilotCliBackend implements Backend {
     const args: string[] = [];
 
     // Load the materialized runtime plugin (skills, hooks, MCP) and pick up its
-    // contributed agent definition. Plugin name is fixed to `kman`; the scoped
-    // `kman:<agent>` form is mandatory for plugin agents.
+    // contributed agent definition. Copilot exposes plugin agents as
+    // `<plugin>:<agent>`.
     args.push('--plugin-dir', pluginDir);
     args.push('--agent', pluginAgent);
 

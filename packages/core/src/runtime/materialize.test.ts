@@ -65,7 +65,9 @@ describe('materializeRuntimePlugin', () => {
   });
 
   test('copilot layout writes plugin.json at the root with name "kman"', async () => {
-    const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'copilot');
+    const { pluginDir, pluginAgent } = await materializeRuntimePlugin(mkProfile(), 'copilot');
+    expect(pluginAgent).toBe('kman:coder');
+
     const manifest = JSON.parse(await readFile(join(pluginDir, 'plugin.json'), 'utf8'));
     expect(manifest.name).toBe('kman');
     expect(manifest.agents).toBe('agents/');
@@ -118,6 +120,17 @@ describe('materializeRuntimePlugin', () => {
     expect(soul).toContain('You are coder.');
   });
 
+  test('copilot quotes injected descriptions so YAML remains parseable', async () => {
+    const { pluginDir } = await materializeRuntimePlugin(
+      mkProfile({ description: 'Use for code that matters: tests, fixes, and refactors.' }),
+      'copilot',
+    );
+    const soul = await readFile(join(pluginDir, 'agents', 'coder.agent.md'), 'utf8');
+    expect(soul).toContain(
+      'description: "Use for code that matters: tests, fixes, and refactors."',
+    );
+  });
+
   test('copilot keeps an existing description from the soul frontmatter', async () => {
     await writeFile(
       join(agentDir('coder'), 'soul.md'),
@@ -126,9 +139,20 @@ describe('materializeRuntimePlugin', () => {
     );
     const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'copilot');
     const soul = await readFile(join(pluginDir, 'agents', 'coder.agent.md'), 'utf8');
-    expect(soul).toContain('description: hand-written');
+    expect(soul).toContain('description: "hand-written"');
     // Description appears exactly once — not duplicated by the injection.
     expect(soul.match(/^description:/gm)?.length).toBe(1);
+  });
+
+  test('copilot quotes existing plain descriptions so YAML remains parseable', async () => {
+    await writeFile(
+      join(agentDir('coder'), 'soul.md'),
+      '---\nname: coder\ndescription: hand-written: with colon\n---\n\nYou are coder.\n',
+      'utf8',
+    );
+    const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'copilot');
+    const soul = await readFile(join(pluginDir, 'agents', 'coder.agent.md'), 'utf8');
+    expect(soul).toContain('description: "hand-written: with colon"');
   });
 
   test('maps component dirs and agent mcp.json to plugin .mcp.json', async () => {
