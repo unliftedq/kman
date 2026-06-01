@@ -70,7 +70,7 @@ Every `kman run` / `kman chat` automatically injects a kman MCP server into the 
 
 ```bash
 kman mcp install claude-code     # writes user-scope ~/.claude.json
-kman mcp install copilot-cli     # writes user-scope github-copilot/mcp_config.json
+kman mcp install copilot-cli     # writes user-scope ~/.copilot/mcp-config.json
 kman mcp config                  # prints the JSON snippet for any other host
 ```
 

@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { homedir, platform } from 'node:os';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Command } from 'commander';
 import { startMcpServer } from '@kman/mcp-server';
@@ -275,12 +275,12 @@ function claudeUserConfigPath(scope: 'user' | 'project'): string {
 }
 
 function copilotConfigPath(): string {
-  // Mirrors what `copilot mcp add` writes — see Copilot CLI docs.
-  if (platform() === 'win32') {
-    const base = process.env['APPDATA'] ?? join(userHome(), 'AppData', 'Roaming');
-    return join(base, 'github-copilot', 'mcp_config.json');
-  }
-  return join(userHome(), '.config', 'github-copilot', 'mcp_config.json');
+  // Copilot CLI stores user-level MCP servers in `mcp-config.json` inside its
+  // config directory, which defaults to `~/.copilot` (i.e. `$HOME/.copilot`)
+  // on every platform and can be relocated via the COPILOT_HOME env var.
+  // See https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference
+  const base = process.env['COPILOT_HOME'] ?? join(userHome(), '.copilot');
+  return join(base, 'mcp-config.json');
 }
 
 async function readJsonOrEmpty(path: string): Promise<Record<string, unknown>> {
