@@ -27,6 +27,22 @@ In short: **don't build one giant agent that knows everything. Build many small 
 
 Every agent lives at `~/.kman/agents/<name>/` as a self-contained directory of agent data: a `soul.md` (the agent's character), an `agent.toml` profile (runtime, model, permissions), and per-agent skills, hooks, and MCP servers. At launch kman materializes that data into a runtime-native plugin under `~/.kman/runtime/<name>/.claude` or `.copilot` (plugin name fixed to `kman`) and points the backend at it — so the same agent runs on both Claude Code and Copilot CLI, with the soul arriving as a real system prompt instead of an ad-hoc injection.
 
+## Example agents
+
+Curious what a kman-managed agent actually looks like? See **[unliftedq/agents](https://github.com/unliftedq/agents)** — a curated collection of portable, domain-focused agents built to run with kman. Each agent is a self-contained folder that captures its persona, skills, tools, and permissions:
+
+```
+<agent>/
+  agent.toml      # name, description, runtime, soul reference, and defaults
+  soul.md         # the agent's persona / system prompt
+  mcp.json        # MCP server configuration, if any
+  skills/         # this agent's domain skills, each containing SKILL.md
+  hooks/          # hooks owned by this agent
+  scripts/        # helper scripts owned by this agent
+```
+
+Browse the repo for concrete examples you can copy, adapt, or dispatch directly via `kman -a <name> run`.
+
 ## Status
 
 | Backend | Status | Notes |

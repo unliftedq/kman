@@ -32,6 +32,22 @@
 
 `kman` 会把 `kman -a <name> run ...` 或 `kman -a <name> chat` 转换成目标后端可识别的调用方式，并以后端原生机制注入 soul prompt。
 
+## 示例 agents
+
+想看一个由 kman 管理的 agent 实际长什么样？可以查看 **[unliftedq/agents](https://github.com/unliftedq/agents)** —— 一个基于 kman 构建的、可移植的领域型 agents 示例集合。每个 agent 都是一个自包含目录，封装了它的 persona、skills、tools 与 permissions：
+
+```text
+<agent>/
+  agent.toml      # 名称、描述、runtime、soul 引用与默认配置
+  soul.md         # agent 的 persona / system prompt
+  mcp.json        # MCP 服务配置（如果需要）
+  skills/         # 该 agent 自有的领域 skills，每个技能目录内包含 SKILL.md
+  hooks/          # 该 agent 自有的 hooks
+  scripts/        # 该 agent 自有的辅助脚本
+```
+
+你可以在这个仓库里直接查看可复制、可改造的完整示例，也可以通过 `kman -a <name> run` 直接派发它们。
+
 ## 后端支持状态
 
 | 后端 | 状态 | 说明 |
