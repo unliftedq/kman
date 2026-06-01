@@ -255,21 +255,32 @@ async function uninstallCopilotCli(): Promise<void> {
 }
 
 /**
+ * Resolve the user's home directory, preferring the `HOME` / `USERPROFILE`
+ * env vars over `os.homedir()`. Node's `homedir()` re-reads `HOME` on every
+ * call, but Bun caches it at process start, so tests that redirect HOME at
+ * runtime are otherwise ignored. Reading the env first keeps both runtimes
+ * (and the tests that patch these vars) consistent.
+ */
+function userHome(): string {
+  return process.env['HOME'] ?? process.env['USERPROFILE'] ?? homedir();
+}
+
+/**
  * Path Claude Code reads for user-scope MCP servers. The CLI also accepts
  * a project-local `.claude.json` in `cwd` for project scope.
  */
 function claudeUserConfigPath(scope: 'user' | 'project'): string {
   if (scope === 'project') return resolve(process.cwd(), '.claude.json');
-  return join(homedir(), '.claude.json');
+  return join(userHome(), '.claude.json');
 }
 
 function copilotConfigPath(): string {
   // Mirrors what `copilot mcp add` writes — see Copilot CLI docs.
   if (platform() === 'win32') {
-    const base = process.env['APPDATA'] ?? join(homedir(), 'AppData', 'Roaming');
+    const base = process.env['APPDATA'] ?? join(userHome(), 'AppData', 'Roaming');
     return join(base, 'github-copilot', 'mcp_config.json');
   }
-  return join(homedir(), '.config', 'github-copilot', 'mcp_config.json');
+  return join(userHome(), '.config', 'github-copilot', 'mcp_config.json');
 }
 
 async function readJsonOrEmpty(path: string): Promise<Record<string, unknown>> {
