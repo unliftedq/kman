@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Command } from 'commander';
 import {
   agentDir,
+  agentProfilePath,
   agentsRoot,
   agentSoulPath,
   defaultProfile,
@@ -102,7 +103,18 @@ export function buildAgentCommand(): Command {
         }
         throw err;
       }
-      const names = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+      const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+      // Only directories containing an agent.toml are real agents; ignore the rest.
+      const checks = await Promise.all(
+        dirs.map(async (name) => {
+          try {
+            return (await stat(agentProfilePath(name))).isFile() ? name : undefined;
+          } catch {
+            return undefined;
+          }
+        }),
+      );
+      const names = checks.filter((name): name is string => name !== undefined).sort();
       if (names.length === 0) {
         process.stdout.write('(no agents)\n');
         return;
