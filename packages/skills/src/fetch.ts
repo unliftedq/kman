@@ -13,6 +13,13 @@ export interface MaterializedSource {
   rootDir: string;
   /** Optional subpath inside rootDir (relative). */
   subpath: string | undefined;
+  /**
+   * The exact commit hash the source was resolved to, for git-backed sources
+   * (github/gitlab/git/well-known). Recorded in the skill manifest so the
+   * vendored skill pins the precise commit it came from. Undefined for local
+   * sources.
+   */
+  resolvedRef: string | undefined;
   cleanup: () => Promise<void>;
 }
 
@@ -24,7 +31,7 @@ export interface MaterializedSource {
 export async function materialize(source: ParsedSource): Promise<MaterializedSource> {
   switch (source.kind) {
     case 'local':
-      return { rootDir: source.path, subpath: source.subpath, cleanup: async () => {} };
+      return { rootDir: source.path, subpath: source.subpath, resolvedRef: undefined, cleanup: async () => {} };
 
     case 'github':
       return cloneGit(`https://github.com/${source.owner}/${source.repo}.git`, source.ref, source.subpath);
@@ -70,9 +77,13 @@ async function cloneGit(
       await runGit(['checkout', ref], dir);
     }
   }
+  // Record the exact commit the working tree resolved to, so the vendored skill
+  // pins the precise commit even when the user asked for a branch (or nothing).
+  const resolvedRef = (await runGitCapture(['rev-parse', 'HEAD'], dir)).trim() || undefined;
   return {
     rootDir: dir,
     subpath,
+    resolvedRef,
     cleanup: () => rm(dir, { recursive: true, force: true }),
   };
 }
@@ -93,6 +104,32 @@ function runGit(args: string[], cwd?: string): Promise<void> {
     });
     child.on('exit', (code) => {
       if (code === 0) res();
+      else rej(new UserError(`git ${args.join(' ')} failed: ${stderr.trim()}`));
+    });
+  });
+}
+
+/** Run git and resolve with its captured stdout (used to read the resolved commit). */
+function runGitCapture(args: string[], cwd?: string): Promise<string> {
+  return new Promise<string>((res, rej) => {
+    const child = spawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout?.on('data', (d) => {
+      stdout += d.toString();
+    });
+    child.stderr?.on('data', (d) => {
+      stderr += d.toString();
+    });
+    child.on('error', (err) => {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        rej(new BackendUnavailableError('git not found on PATH; cannot fetch skill sources.'));
+      } else {
+        rej(err);
+      }
+    });
+    child.on('exit', (code) => {
+      if (code === 0) res(stdout);
       else rej(new UserError(`git ${args.join(' ')} failed: ${stderr.trim()}`));
     });
   });

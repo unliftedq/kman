@@ -110,6 +110,39 @@ describe('materializeRuntimePlugin', () => {
     expect(soul).toContain('You are coder.');
   });
 
+  test('injects name frontmatter into a plain-markdown soul (claude)', async () => {
+    // soul.md is plain markdown by default; the runtime injects the `name:` the
+    // backend registers the agent under.
+    await writeFile(join(agentDir('coder'), 'soul.md'), '# coder\n\nYou are coder.\n', 'utf8');
+    const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'claude');
+    const soul = await readFile(join(pluginDir, 'agents', 'coder.md'), 'utf8');
+    expect(soul).toMatch(/^name: coder$/m);
+    expect(soul).toContain('# coder');
+    expect(soul).toContain('You are coder.');
+  });
+
+  test('injects name + description into a plain-markdown soul (copilot)', async () => {
+    await writeFile(join(agentDir('coder'), 'soul.md'), 'You are coder.\n', 'utf8');
+    const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'copilot');
+    const soul = await readFile(join(pluginDir, 'agents', 'coder.agent.md'), 'utf8');
+    expect(soul).toMatch(/^name: coder$/m);
+    expect(soul).toMatch(/^description:/m);
+    expect(soul).toContain('You are coder.');
+  });
+
+  test('forces the soul frontmatter name to match the profile name', async () => {
+    // A stale hand-written name must not break the `kman:<name>` selector.
+    await writeFile(
+      join(agentDir('coder'), 'soul.md'),
+      '---\nname: stale\n---\n\nYou are coder.\n',
+      'utf8',
+    );
+    const { pluginDir } = await materializeRuntimePlugin(mkProfile(), 'claude');
+    const soul = await readFile(join(pluginDir, 'agents', 'coder.md'), 'utf8');
+    expect(soul).toMatch(/^name: coder$/m);
+    expect(soul).not.toContain('name: stale');
+  });
+
   test('copilot exposes the soul as agents/<name>.agent.md with a description', async () => {
     // copilot only recognizes `<name>.agent.md` files and drops agents whose
     // frontmatter lacks a `description:`.

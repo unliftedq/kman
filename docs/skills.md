@@ -48,7 +48,9 @@ Pin a branch, tag, or commit with `--ref`:
 kman skills add --agent coder --source owner/repo --skill humanizer --ref v2.0.0
 ```
 
-The resolved ref is recorded in the skill's vendoring manifest.
+The exact commit hash the source resolves to is recorded as `ref` in the
+skill's vendoring manifest — even when you don't pass `--ref` — so every
+vendored skill pins the precise commit it came from.
 
 ## Listing and inspecting
 
@@ -70,12 +72,16 @@ Each vendored skill carries a `.kman-skill.json` manifest:
 {
   "source": "vercel-labs/agent-skills",
   "source_url": "https://github.com/vercel-labs/agent-skills",
-  "ref": "v1.3.2",
+  "ref": "abc123def4567890abcdef1234567890abcdef12",
   "installed_at": "2026-05-25T09:12:47Z",
   "version": "git-sha-abc123",
   "checksum": "sha256:..."
 }
 ```
+
+`ref` is the exact commit hash the source resolved to at install time (for
+git-backed sources), so the vendored skill records the precise commit even if
+you installed from a branch or without `--ref`.
 
 ## Updating
 

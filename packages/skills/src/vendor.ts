@@ -12,6 +12,12 @@ export interface VendorOptions {
   skill: DiscoveredSkill;
   /** Override `name` (default: skill.name). */
   installName?: string;
+  /**
+   * Exact commit hash the source resolved to (from {@link materialize}). When
+   * present it is recorded as the manifest `ref`, pinning the vendored skill to
+   * the precise commit even if the user supplied a branch or no ref at all.
+   */
+  resolvedRef?: string;
   /** Overwrite if a skill with this name already exists. */
   force?: boolean;
 }
@@ -49,7 +55,10 @@ export async function vendorSkill(opts: VendorOptions): Promise<VendorResult> {
   };
   const url = sourceUrl(opts.source);
   if (url) manifest.source_url = url;
-  if ('ref' in opts.source && opts.source.ref) manifest.ref = opts.source.ref;
+  // Prefer the exact resolved commit hash so the manifest pins the precise
+  // commit; fall back to any ref the user pinned in the source descriptor.
+  const ref = opts.resolvedRef ?? ('ref' in opts.source ? opts.source.ref : undefined);
+  if (ref) manifest.ref = ref;
   await writeManifest(dest, manifest);
 
   return { installedPath: dest, manifest };
