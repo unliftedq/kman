@@ -60,7 +60,7 @@ kman agent delete <name> [--yes]
 
 `agent create` writes `~/.kman/agents/<name>/` with agent data only:
 
-- `soul.md` — the agent's system prompt, with a `name:` frontmatter (edit this).
+- `soul.md` — the agent's system prompt, plain markdown by default (edit this). The runtime injects the `name:`/`description:` frontmatter each backend needs at launch.
 - `agent.toml` — kman profile (default backend, model, permissions).
 - `skills/`, `hooks/`, `scripts/`, `mcp.json` — empty scaffolding for per-agent extensions.
 

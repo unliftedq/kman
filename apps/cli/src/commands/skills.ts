@@ -38,6 +38,7 @@ export function buildSkillsCommand(): Command {
             agent,
             source,
             skill,
+            ...(mat.resolvedRef !== undefined ? { resolvedRef: mat.resolvedRef } : {}),
             force: opts.force === true,
           });
           process.stdout.write(`Installed ${skill.name} → ${res.installedPath}\n`);

@@ -20,7 +20,7 @@ backend.
 | Term | Meaning |
 |---|---|
 | **Agent** | A named profile living at `~/.kman/agents/<name>/`. Its data is a soul prompt, a TOML profile, and per-agent skills, hooks, scripts, and MCP servers. |
-| **Soul** | The agent's persona / system prompt, stored in `soul.md`. The file body becomes a real system prompt; YAML frontmatter (`name:`, `description:`) identifies the agent. |
+| **Soul** | The agent's persona / system prompt, stored in `soul.md`. Plain markdown by default — the whole file is the system prompt. The runtime injects the frontmatter each backend needs (`name:`, `description:`) when it materializes the agent. |
 | **Profile** | `agent.toml` — the runtime defaults (backend, model, permissions, output format, max turns). |
 | **Backend / runtime** | The underlying agent runtime that actually runs inference (`claude-code`, `copilot-cli`). |
 | **AgentContext** | The immutable object kman builds before spawning a backend; the single source of truth for a run. See [Architecture](./architecture.md). |

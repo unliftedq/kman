@@ -103,10 +103,11 @@ async function buildPlugin(
 
   await writeManifest(pluginDir, src, profile, layout);
 
-  // soul.md doubles as the plugin-contributed agent definition. Its YAML
-  // frontmatter `name:` is what the backend registers the agent under. The
-  // materialized plugin name is fixed to `kman`, so backends resolve the scoped
-  // selector as `kman:<name>`.
+  // soul.md is plain markdown by default. On materialization kman injects the
+  // YAML frontmatter each runtime needs into the contributed agent definition;
+  // `name:` is what the backend registers the agent under. The materialized
+  // plugin name is fixed to `kman`, so backends resolve the scoped selector as
+  // `kman:<name>`.
   const soulFile = profile.soul.prompt_file;
   const soulPath = isAbsolute(soulFile) ? soulFile : agentSoulPath(profile.name, soulFile);
   await mkdir(join(pluginDir, 'agents'), { recursive: true });
@@ -152,15 +153,16 @@ async function writePromptCommands(pluginDir: string): Promise<void> {
 /**
  * Expose soul.md as the plugin's contributed agent definition.
  *
- * The two backends differ in what they require:
- *  - claude-code registers `agents/<name>.md` and tolerates frontmatter that
- *    carries only `name:`. We symlink the soul straight through so user edits
- *    stay live.
+ * soul.md is plain markdown by default, so kman injects the YAML frontmatter
+ * each runtime requires (regenerating the file from scratch on every launch, so
+ * edits to the soul are still picked up next time):
+ *  - both backends need `name:` to register/resolve the agent. It is forced to
+ *    the profile name so the `kman:<name>` selector always resolves, regardless
+ *    of any stale `name:` a user may have hand-written into the soul.
+ *  - claude-code registers `agents/<name>.md`.
  *  - copilot-cli only recognizes agent files named `<name>.agent.md` and
- *    silently drops any whose frontmatter lacks a `description:`. We therefore
- *    read the soul, guarantee a `description:` line, and write a real file
- *    (regenerated from scratch on every launch, so edits are still picked up
- *    next time).
+ *    silently drops any whose frontmatter lacks a `description:`, so a
+ *    `description:` line is guaranteed for it.
  */
 async function materializeAgentFile(
   soulPath: string,
@@ -170,14 +172,33 @@ async function materializeAgentFile(
 ): Promise<void> {
   const agentsDir = join(pluginDir, 'agents');
 
-  if (layout === 'claude') {
-    await linkOrCopy(soulPath, join(agentsDir, `${profile.name}.md`), 'file');
-    return;
+  const raw = await readFile(soulPath, 'utf8');
+  let content = ensureName(raw, profile);
+  if (layout === 'copilot') content = ensureDescription(content, profile);
+
+  const filename = layout === 'claude' ? `${profile.name}.md` : `${profile.name}.agent.md`;
+  await writeFile(join(agentsDir, filename), content, 'utf8');
+}
+
+/**
+ * Ensure the agent definition's YAML frontmatter carries a `name:` matching the
+ * profile. Plain markdown (the default soul) gets a minimal frontmatter block
+ * prepended; existing frontmatter has its `name:` rewritten (or inserted) so it
+ * always agrees with the profile name the selector is keyed on.
+ */
+function ensureName(raw: string, profile: Profile): string {
+  if (!raw.startsWith('---\n')) {
+    return `---\nname: ${profile.name}\n---\n\n${raw}`;
   }
 
-  const raw = await readFile(soulPath, 'utf8');
-  const content = ensureDescription(raw, profile);
-  await writeFile(join(agentsDir, `${profile.name}.agent.md`), content, 'utf8');
+  const end = raw.indexOf('\n---', 4);
+  if (end < 0) return raw; // malformed frontmatter — leave untouched.
+
+  const frontmatter = raw.slice(0, end);
+  if (/^name:\s*.*$/m.test(frontmatter)) {
+    return raw.replace(/^name:\s*.*$/m, `name: ${profile.name}`);
+  }
+  return raw.replace(/^---\n/, `---\nname: ${profile.name}\n`);
 }
 
 /**

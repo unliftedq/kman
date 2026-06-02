@@ -12,7 +12,7 @@ that agent behaves.
 └── agents/
     └── coder/                         # agent directory = agent data only
         ├── agent.toml                 # kman profile (runtime, model, defaults)
-        ├── soul.md                    # system prompt + agent frontmatter (name:)
+        ├── soul.md                    # system prompt (plain markdown by default)
         ├── skills/                    # skills: <name>/SKILL.md
         │   └── humanizer/
         │       ├── SKILL.md
@@ -66,23 +66,26 @@ CLI overrides (`--runtime`, `--model`, `--permission`, …) act on the in-memory
 
 ## `soul.md`
 
-`soul.md` is the agent's persona. The file **body** becomes the agent's system
-prompt; YAML frontmatter identifies the contributed agent. Edit this file
-directly to shape how your agent thinks and behaves:
+`soul.md` is the agent's persona. It is **plain markdown by default** — the
+whole file is the agent's system prompt. Edit it directly to shape how your
+agent thinks and behaves:
 
 ```markdown
----
-name: coder
-description: Senior backend engineer agent
----
-
 You are a meticulous senior backend engineer. Prefer small, surgical changes…
 ```
 
-`copilot-cli` requires a `description:` in the frontmatter. kman delivers the
-soul through each backend's native agent mechanism, so the model treats it as a
-real system prompt rather than a user message. If a selected backend cannot
-accept the rendered soul prompt, kman exits with code `4` before spawning.
+You don't need to add YAML frontmatter. When an agent launches, kman
+materializes a runtime plugin under `~/.kman/runtime/<name>/` and injects the
+frontmatter each backend needs into the contributed agent definition — `name:`
+(forced to the profile name so the `kman:<name>` selector always resolves) and,
+for `copilot-cli`, a `description:` (taken from the profile, or derived from the
+agent name). Any frontmatter you do add to `soul.md` is preserved, but its
+`name:` is overridden to match the profile.
+
+kman delivers the soul through each backend's native agent mechanism, so the
+model treats it as a real system prompt rather than a user message. If a
+selected backend cannot accept the rendered soul prompt, kman exits with code
+`4` before spawning.
 
 ## Permission levels
 

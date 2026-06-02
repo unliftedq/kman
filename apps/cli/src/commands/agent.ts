@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Command } from 'commander';
 import {
@@ -74,13 +74,12 @@ export function buildAgentCommand(): Command {
 
       const soulBody =
         opts.soul ?? `# ${name}\n\nYou are ${name}. Replace this file with your agent's system prompt.\n`;
-      // soul.md carries the YAML frontmatter (at least `name:`) that both
-      // backends' plugin loaders require: at launch kman materializes a runtime
-      // plugin under ~/.kman/runtime/<name>/ and exposes soul.md as the
-      // contributed `agents/<name>.md`. The agent directory itself stays free of
-      // plugin scaffolding. `description:` is only written when supplied.
-      const descLine = opts.description ? `description: ${quoteYamlString(opts.description)}\n` : '';
-      const soulContent = `---\nname: ${name}\n${descLine}---\n\n${soulBody}`;
+      // soul.md is plain markdown by default: its body is the agent's system
+      // prompt. The YAML frontmatter each backend needs (at least `name:`, plus
+      // `description:` for copilot-cli) is injected per runtime when kman
+      // materializes the agent's plugin under ~/.kman/runtime/<name>/, so the
+      // agent directory stays free of runtime-specific scaffolding.
+      const soulContent = soulBody.endsWith('\n') ? soulBody : `${soulBody}\n`;
       await writeFile(agentSoulPath(name, profile.soul.prompt_file), soulContent, 'utf8');
 
       await writeFile(join(dir, 'mcp.json'), JSON.stringify({ mcpServers: {} }, null, 2) + '\n', 'utf8');
@@ -187,10 +186,9 @@ export function buildAgentCommand(): Command {
       const profile = await readProfile(to);
       await writeProfile({ ...profile, name: to });
 
-      // soul.md's frontmatter `name:` is what the runtime plugin registers the
-      // agent under. Drift here means backend selectors fail, so rewrite the
-      // frontmatter to agree with the renamed profile.
-      await rewriteSoulFrontmatterName(join(dst, profile.soul.prompt_file), to);
+      // The runtime plugin registers the agent under the profile name (injected
+      // into soul.md's frontmatter at materialization), so no soul rewrite is
+      // needed here.
 
       // Derived runtime plugin dirs are keyed by agent name; drop the stale
       // ones so the next launch rematerializes under the new name.
@@ -203,10 +201,6 @@ export function buildAgentCommand(): Command {
   return cmd;
 }
 
-function quoteYamlString(value: string): string {
-  return JSON.stringify(value);
-}
-
 async function pathExists(p: string): Promise<boolean> {
   try {
     await stat(p);
@@ -214,29 +208,5 @@ async function pathExists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/**
- * Replace the `name:` line in soul.md's YAML frontmatter without touching the
- * body. If no frontmatter is present, prepend a minimal block.
- */
-async function rewriteSoulFrontmatterName(path: string, newName: string): Promise<void> {
-  if (!(await pathExists(path))) return;
-  const raw = await readFile(path, 'utf8');
-  if (!raw.startsWith('---')) {
-    const prefix = `---\nname: ${newName}\n---\n\n`;
-    await writeFile(path, prefix + raw, 'utf8');
-    return;
-  }
-  const end = raw.indexOf('\n---', 3);
-  if (end < 0) return; // malformed frontmatter — leave untouched.
-  const frontmatter = raw.slice(0, end);
-  const rest = raw.slice(end);
-  const rewritten = frontmatter.replace(/^name:.*$/m, `name: ${newName}`);
-  // If there was no `name:` line, inject one.
-  const withName = /^name:/m.test(rewritten)
-    ? rewritten
-    : rewritten.replace(/^---\n/, `---\nname: ${newName}\n`);
-  await writeFile(path, withName + rest, 'utf8');
 }
 

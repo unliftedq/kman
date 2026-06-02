@@ -57,6 +57,7 @@ export async function updateSkill(opts: UpdateOptions): Promise<{ installedPath:
       source,
       skill: match,
       installName: opts.skill,
+      ...(mat.resolvedRef !== undefined ? { resolvedRef: mat.resolvedRef } : {}),
       force: true,
     });
     return { installedPath };
