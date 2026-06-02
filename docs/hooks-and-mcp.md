@@ -36,7 +36,7 @@ inside the runtime plugin at launch:
 }
 ```
 
-- `mcp.json` is loaded by the backend through its Claude Code plugin support. If the backend does not support MCP servers, the file is ignored.
+- `mcp.json` is loaded by the backend through its Claude Code plugin support. If the backend does not support MCP servers, the configured servers are not started — but kman still validates the file's shape regardless of backend support (see next point).
 - If `mcp.json` references an invalid server or command shape, kman exits with code `2` before spawning the backend.
 
 > This file configures MCP servers that **the agent uses**. For making agents
