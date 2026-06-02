@@ -1,0 +1,100 @@
+# Multi-Agent Dispatch
+
+kman lets agents discover and call each other through a stdio **MCP server**, and
+lets you compose agents with plain shell pipes.
+
+## The kman MCP server
+
+`kman mcp` starts a stdio MCP server (`@kman/mcp-server`). It walks
+`~/.kman/agents/` at startup and offers three tools and two resource shapes that
+any MCP host can consume:
+
+| Surface | Name | Purpose |
+|---|---|---|
+| tool | `kman_list_agents` | Roster of every agent, excluding the calling self. |
+| tool | `kman_describe_agent` | `agent.toml` + `soul.md` for one agent. |
+| tool | `kman_run_agent` | Dispatch a task — re-shells `kman -a <name> run --task <task>` as a subprocess. |
+| resource | `kman://agents` | Same roster as a JSON resource. |
+| resource template | `kman://agents/{name}` | Per-agent profile + soul. |
+
+On every `initialize`, the server also returns server-level `instructions` (a
+short guideline the host can inject as system-prompt context, nudging the model
+to call `kman_list_agents` proactively) and exposes four prompt templates via
+`prompts/list`: `list-agents`, `find-agent`, `delegate-task`, and
+`second-opinion`.
+
+Hosts that surface MCP prompts as slash commands (e.g. claude-code) turn these
+into one-keystroke workflows. copilot-cli does **not** consume MCP prompts, so
+for the copilot layout the runtime-plugin materializer renders the same four
+templates as plugin **commands** (`kman-commands/<name>.md`) — giving copilot
+users the same `/list-agents`, `/find-agent`, … slash commands. The shared
+template definitions live in `@kman/core` so the MCP server and the materializer
+stay in sync.
+
+## Two ways to wire it up
+
+### 1. Auto-injection (default)
+
+Every `kman run` / `kman chat` materializes a single standalone MCP config at
+`~/.kman/runtime/mcp-config.json` and hands it to the backend through its native
+flag — `--mcp-config` for claude-code, `--additional-mcp-config` for
+copilot-cli. No plugin wrapper is involved, so the host registers the server in
+its plain namespace (`mcp__kman__<surface>`).
+
+The running agent's name flows through the `KMAN_SELF_AGENT` env var, substituted
+into the config at spawn time, which the MCP server reads to hide the calling
+agent from its own roster and refuse self-dispatch. Set `KMAN_NO_MCP=1` to opt
+out per process.
+
+### 2. External runtimes
+
+```bash
+kman mcp install   claude-code     # writes user-scope ~/.claude.json
+kman mcp install   copilot-cli     # writes user-scope ~/.copilot/mcp-config.json
+kman mcp config                    # prints a JSON snippet for any other host
+kman mcp uninstall claude-code
+kman mcp uninstall copilot-cli
+```
+
+`kman mcp install` writes an `mcpServers.kman` entry into the runtime's
+user-scope config. `kman mcp config` prints the JSON snippet for hosts that
+aren't directly supported.
+
+Both paths produce the same `mcp__kman__<surface>` naming, so prompts, tool
+calls, and slash commands look identical whether you opted in via global install
+or got auto-injection.
+
+## Cycle and depth protection
+
+Cycle and depth protection are carried through `KMAN_RUN_CHAIN` — a
+comma-separated list of agents in the current delegation stack. The MCP server
+rejects any dispatch whose target is already in the chain (preventing
+`a → b → a` loops) and refuses to spawn beyond depth `8`.
+
+Each `kman_run_agent` re-shells `kman` rather than running in-process, which
+keeps the MCP server's stdout transport isolated from peer agents' stdio.
+
+Override the executable used inside spawned backends with `KMAN_BIN` (defaults:
+the published `kman` shim, or `node <bundled script>` / `bun <source script>`
+when running from source).
+
+## Shell composition
+
+You can also compose agents without MCP, using plain shell pipes:
+
+```bash
+# Pipe (linear, text)
+kman run --agent extractor --task "extract requirements from spec.md" \
+  | kman run --agent designer --task "design API given these requirements" \
+  | kman run --agent coder    --task "implement the API"
+
+# Programmatic (structured)
+PLAN=$(kman run --agent planner --task "$1" --output json)
+kman run --agent coder  --task "$(echo $PLAN | jq -r .step1)"
+kman run --agent tester --task "$(echo $PLAN | jq -r .step2)"
+```
+
+## Related
+
+- Server command details: [CLI Reference](./cli-reference.md).
+- Per-agent MCP servers the agent *uses* (vs. peer dispatch): [Hooks & MCP](./hooks-and-mcp.md).

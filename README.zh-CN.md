@@ -6,7 +6,7 @@
 
 `kman` 不是模型运行时本身，而是运行时之上的统一调度层。你可以在 Claude Code、GitHub Copilot CLI 等后端之上，维护一组具名 agent（如 `orchestrator`、`developer`、`researcher`），让每个 agent 拥有独立目录、独立灵魂提示词（soul prompt）、独立 skills/hooks/MCP 配置，并在需要时精准调用。
 
-想了解设计思路可查看 [docs/DESIGN.md](docs/DESIGN.md)；想直接查看已发布 CLI 说明，可跳转 **[`@unliftedq/kman`](apps/cli/README.md)**。
+想了解设计思路与完整使用说明可查看 [docs](docs/README.md)；想直接查看已发布 CLI 说明，可跳转 **[`@unliftedq/kman`](apps/cli/README.md)**。
 
 ## 为什么需要 kman？
 
@@ -81,7 +81,7 @@ kman mcp install copilot-cli
 kman mcp config
 ```
 
-为避免循环调用，`KMAN_RUN_CHAIN` 会阻止 `a → b → a` 这类链路；默认最大深度为 8。更多细节见 [docs/DESIGN.md §3.4](docs/DESIGN.md#34-multi-agent-invocation-via-kman-mcp)。
+为避免循环调用，`KMAN_RUN_CHAIN` 会阻止 `a → b → a` 这类链路；默认最大深度为 8。更多细节见 [docs/multi-agent.md](docs/multi-agent.md)。
 
 ## 项目结构
 
@@ -97,7 +97,7 @@ kman mcp config
 │   ├── backend-copilot-cli        # @kman/backend-copilot-cli
 │   └── mcp-server                 # @kman/mcp-server
 ├── scripts/                       # 一次性迁移脚本
-└── docs/DESIGN.md
+└── docs/                          # 文档（从 docs/README.md 开始）
 ```
 
 ## 工具链

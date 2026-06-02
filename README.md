@@ -6,7 +6,7 @@
 
 `kman` sits *above* existing agent runtimes (Claude Code, GitHub Copilot CLI, ...) and gives each named agent its own isolated directory, soul prompt, skills, hooks, and MCP servers. One CLI to dispatch them all; one filesystem layout that every supported runtime can load — kman materializes each agent into the runtime's native plugin shape on demand.
 
-See [docs/DESIGN.md](docs/DESIGN.md) for the architecture, or jump straight to the published CLI: **[`@unliftedq/kman`](apps/cli/README.md)**.
+See the [docs](docs/README.md) for the architecture and full usage guide, or jump straight to the published CLI: **[`@unliftedq/kman`](apps/cli/README.md)**.
 
 ## Why kman?
 
@@ -74,7 +74,7 @@ kman mcp install copilot-cli     # writes user-scope ~/.copilot/mcp-config.json
 kman mcp config                  # prints the JSON snippet for any other host
 ```
 
-Cycle protection (`KMAN_RUN_CHAIN`) prevents `a → b → a` loops; depth is capped at 8. See [docs/DESIGN.md §3.4](docs/DESIGN.md#34-multi-agent-invocation-via-kman-mcp).
+Cycle protection (`KMAN_RUN_CHAIN`) prevents `a → b → a` loops; depth is capped at 8. See [docs/multi-agent.md](docs/multi-agent.md).
 
 ## Layout
 
@@ -90,7 +90,7 @@ Cycle protection (`KMAN_RUN_CHAIN`) prevents `a → b → a` loops; depth is cap
 │   ├── backend-copilot-cli        # @kman/backend-copilot-cli
 │   └── mcp-server                 # @kman/mcp-server — exposes the agent roster as an MCP server
 ├── scripts/                       # one-shot migration helpers
-└── docs/DESIGN.md
+└── docs/                          # documentation (start at docs/README.md)
 ```
 
 ## Toolchain
