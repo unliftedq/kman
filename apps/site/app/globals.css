@@ -1,0 +1,332 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ----------------------------------------------------------------------------
+   Design tokens. One neutral system (zinc-ish) + one locked accent (amber).
+   Light uses a deeper burnt-amber for AA contrast; dark uses a brighter amber.
+   Same accent family across the whole page.
+---------------------------------------------------------------------------- */
+:root {
+  --bg: #fbfbfa;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #f3f3f1;
+  --fg: #1b1b19;
+  --fg-muted: #65655f;
+  --fg-faint: #9a9a92;
+  --line: #e7e6e1;
+  --line-strong: #d8d7d1;
+  --accent: #c2410c;
+  --accent-hover: #9a3412;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(194, 65, 12, 0.09);
+  --code-bg: #f5f5f2;
+
+  --c-comment: var(--fg-faint);
+  --c-keyword: #b0480f;
+  --c-string: #2f7d54;
+  --c-number: #2256c8;
+  --c-attr: #0f6b78;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.dark {
+  --bg: #0a0a0b;
+  --bg-elevated: #131316;
+  --bg-subtle: #141417;
+  --fg: #ededec;
+  --fg-muted: #a2a29b;
+  --fg-faint: #6a6a6e;
+  --line: #222226;
+  --line-strong: #2f2f34;
+  --accent: #fb923c;
+  --accent-hover: #fdba74;
+  --accent-fg: #1a1206;
+  --accent-soft: rgba(251, 146, 60, 0.12);
+  --code-bg: #111114;
+
+  --c-comment: var(--fg-faint);
+  --c-keyword: #fdba74;
+  --c-string: #7fd1a3;
+  --c-number: #8fb3ff;
+  --c-attr: #5fc4d0;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-code-bg: var(--code-bg);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-rise {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   Documentation prose
+---------------------------------------------------------------------------- */
+.prose {
+  color: var(--fg);
+  font-size: 0.975rem;
+  line-height: 1.75;
+}
+.prose > :first-child {
+  margin-top: 0;
+}
+.prose h1 {
+  font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin: 0 0 1.25rem;
+}
+.prose h2 {
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 2.75rem 0 1rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--line);
+}
+.prose h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 2rem 0 0.75rem;
+}
+.prose h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+}
+.prose :is(h1, h2, h3, h4) {
+  scroll-margin-top: 6rem;
+}
+.prose p,
+.prose ul,
+.prose ol {
+  margin: 0 0 1.1rem;
+}
+.prose p,
+.prose li {
+  color: var(--fg);
+  max-width: 72ch;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.4rem;
+}
+.prose li {
+  margin: 0.35rem 0;
+}
+.prose ul li::marker {
+  color: var(--accent);
+}
+.prose a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  transition: border-color 0.15s ease;
+}
+.prose a:hover {
+  border-bottom-color: var(--accent);
+}
+.prose strong {
+  color: var(--fg);
+  font-weight: 650;
+}
+.prose blockquote {
+  margin: 1.5rem 0;
+  padding: 0.25rem 0 0.25rem 1.1rem;
+  border-left: 2px solid var(--accent);
+  color: var(--fg-muted);
+}
+.prose blockquote p {
+  color: var(--fg-muted);
+}
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2.5rem 0;
+}
+.prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0.12em 0.38em;
+  color: var(--fg);
+}
+
+/* Heading anchors (rehype-autolink-headings) inherit heading styling. */
+.prose :is(h1, h2, h3, h4) a {
+  color: inherit;
+  font-weight: inherit;
+  border-bottom: 0;
+  text-decoration: none;
+}
+
+/* Disable ligatures in mono so "--flag" never fuses into a long dash. */
+code,
+pre,
+kbd,
+samp {
+  font-feature-settings: "liga" 0, "calt" 0;
+  font-variant-ligatures: none;
+}
+.prose pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem;
+  overflow-x: auto;
+  margin: 0 0 1.4rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.prose pre code {
+  font-family: var(--font-mono);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--fg);
+}
+
+/* Tables */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.6rem;
+  font-size: 0.9rem;
+  display: block;
+  overflow-x: auto;
+}
+.prose thead {
+  border-bottom: 1px solid var(--line-strong);
+}
+.prose th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.6rem 0.9rem;
+  color: var(--fg);
+  white-space: nowrap;
+}
+.prose td {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-muted);
+  vertical-align: top;
+}
+.prose tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ----------------------------------------------------------------------------
+   highlight.js token colors (themed via CSS variables)
+---------------------------------------------------------------------------- */
+.hljs {
+  color: var(--fg);
+  background: transparent;
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--c-comment);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-type,
+.hljs-name,
+.hljs-strong {
+  color: var(--c-keyword);
+}
+.hljs-string,
+.hljs-title,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-addition {
+  color: var(--c-string);
+}
+.hljs-number,
+.hljs-bullet,
+.hljs-symbol,
+.hljs-link,
+.hljs-meta {
+  color: var(--c-number);
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-built_in,
+.hljs-class .hljs-title {
+  color: var(--c-attr);
+}
+.hljs-emphasis {
+  font-style: italic;
+}

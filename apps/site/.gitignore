@@ -1,0 +1,9 @@
+# Next.js
+/.next/
+/out/
+
+# Turbo
+.turbo
+
+# Generated
+next-env.d.ts
