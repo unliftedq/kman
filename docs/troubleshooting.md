@@ -62,8 +62,8 @@ spawning the backend. Validate the JSON and the `mcpServers` entries; see
 ### A hook blocked the run (exit 3)
 
 A configured hook returned a blocking result. Inspect `hooks/hooks.json` and the
-referenced `scripts/`. Remember scripts must be executable (a `doctor` check flags non-executable hook
-scripts).
+referenced `scripts/`. Remember scripts must be executable (a `doctor` check
+flags non-executable hook scripts).
 
 ### Skill update refused
 

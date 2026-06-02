@@ -79,11 +79,10 @@ description: Senior backend engineer agent
 You are a meticulous senior backend engineer. Prefer small, surgical changes…
 ```
 
-`copilot-cli` requires a `description:` in the frontmatter. The soul is delivered
-through each backend's native agent mechanism, so the
-model treats it as a real system prompt rather than a user message. If a selected
-backend cannot accept the rendered soul prompt, kman exits with code `4` before
-spawning.
+`copilot-cli` requires a `description:` in the frontmatter. kman delivers the
+soul through each backend's native agent mechanism, so the model treats it as a
+real system prompt rather than a user message. If a selected backend cannot
+accept the rendered soul prompt, kman exits with code `4` before spawning.
 
 ## Permission levels
 

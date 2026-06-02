@@ -40,7 +40,8 @@ Use an `mcpServers` object for per-agent MCP servers:
 
 Hook configuration uses the selected runtime's hook format. Scripts live under
 `scripts/`; use the path and substitution variables documented by that runtime
-to reference them from `hooks.json`.
+to reference them from `hooks.json`. For the currently supported hook format,
+see the [Claude Code hooks reference](https://docs.anthropic.com/en/docs/claude-code/hooks).
 
 Supported hook events, types, matcher semantics, and substitution variables are
 defined by the selected runtime. Backends that do not implement a given hook
