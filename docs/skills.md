@@ -98,5 +98,4 @@ kman skills remove --agent coder --skill humanizer
 
 ## Related
 
-- Skills are materialized into the runtime plugin at launch — see [Architecture](./architecture.md).
 - Full flag list: [CLI Reference](./cli-reference.md).

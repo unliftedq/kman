@@ -23,23 +23,17 @@ to call `kman_list_agents` proactively) and exposes four prompt templates via
 `prompts/list`: `list-agents`, `find-agent`, `delegate-task`, and
 `second-opinion`.
 
-Hosts that surface MCP prompts as slash commands (e.g. claude-code) turn these
-into one-keystroke workflows. copilot-cli does **not** consume MCP prompts, so
-for the copilot layout the runtime-plugin materializer renders the same four
-templates as plugin **commands** (`kman-commands/<name>.md`) — giving copilot
-users the same `/list-agents`, `/find-agent`, … slash commands. The shared
-template definitions live in `@kman/core` so the MCP server and the materializer
-stay in sync.
+Hosts that surface MCP prompts as slash commands can turn these into
+one-keystroke workflows. Where a runtime needs a different mechanism for those
+shortcuts, kman keeps the visible command names aligned.
 
 ## Two ways to wire it up
 
 ### 1. Auto-injection (default)
 
-Every `kman run` / `kman chat` materializes a single standalone MCP config at
-`~/.kman/runtime/mcp-config.json` and hands it to the backend through its native
-flag — `--mcp-config` for claude-code, `--additional-mcp-config` for
-copilot-cli. No plugin wrapper is involved, so the host registers the server in
-its plain namespace (`mcp__kman__<surface>`).
+Every `kman run` / `kman chat` prepares a temporary MCP configuration for the
+selected runtime. The host registers the server in its plain namespace
+(`mcp__kman__<surface>`).
 
 The running agent's name flows through the `KMAN_SELF_AGENT` env var, substituted
 into the config at spawn time, which the MCP server reads to hide the calling

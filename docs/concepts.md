@@ -8,9 +8,9 @@ kman is **not** another agent runtime. It is an **agent manager** that sits abov
 existing runtimes (`claude-code`, `copilot-cli`, and later `codex`, `gemini`, …)
 and gives them three things they lack as a system:
 
-1. **Named agent profiles** — each agent has its own soul, plugin files, and default runtime, addressable by name.
+1. **Named agent profiles** — each agent has its own soul prompt, skills, hooks, MCP servers, permissions, and default runtime, addressable by name.
 2. **A backend-agnostic CLI** — one set of commands, one profile format, regardless of which underlying runtime does the work.
-3. **Claude Code plugin compatibility** — every kman agent is materialized into a valid Claude Code / Copilot plugin at launch, so skills / hooks / MCP servers / commands written for the broader ecosystem work unchanged.
+3. **Agent-level isolation** — each runtime invocation receives only the files and defaults for the selected agent.
 
 kman never calls an LLM API directly. All inference happens inside the chosen
 backend.
@@ -20,11 +20,10 @@ backend.
 | Term | Meaning |
 |---|---|
 | **Agent** | A named profile living at `~/.kman/agents/<name>/`. Its data is a soul prompt, a TOML profile, and per-agent skills, hooks, scripts, and MCP servers. |
-| **Soul** | The agent's persona / system prompt, stored in `soul.md`. The file body becomes a real system prompt; YAML frontmatter (`name:`, `description:`) identifies the contributed agent. |
+| **Soul** | The agent's persona / system prompt, stored in `soul.md`. The file body becomes a real system prompt; YAML frontmatter (`name:`, `description:`) identifies the agent. |
 | **Profile** | `agent.toml` — the runtime defaults (backend, model, permissions, output format, max turns). |
 | **Backend / runtime** | The underlying agent runtime that actually runs inference (`claude-code`, `copilot-cli`). |
 | **AgentContext** | The immutable object kman builds before spawning a backend; the single source of truth for a run. See [Architecture](./architecture.md). |
-| **Runtime plugin** | The backend-native plugin layout kman *derives* at launch under `~/.kman/runtime/<name>/`. Not stored in the agent directory. |
 | **Skill** | A vendored `SKILL.md` directory installed into an agent's `skills/`. |
 
 ## Agent names
@@ -66,7 +65,7 @@ kman v1 ships only the CLI. To keep the surface honest, several things are
 - **No project-local profiles.** All agents live under `~/.kman/`; there is no `.kman/` inside repositories.
 - **No skill template system.** New agents start with an empty skills directory.
 - **No shell / HTTP custom tools.** v1 only wires MCP tools through `mcp.json`.
-- **No Codex / Gemini adapters yet.** v1 implements `claude-code` and `copilot-cli` first; the adapter shape is in place for the others.
+- **No Codex / Gemini support yet.** v1 implements `claude-code` and `copilot-cli` first.
 - **No compiled binary distribution yet.** v1 ships as an npm package consumed via Bun/npm. Native binaries and OS packaging are future work.
 
 What *does* ship in v1 beyond the basics: `kman mcp` (cross-agent dispatch),
@@ -78,6 +77,6 @@ What *does* ship in v1 beyond the basics: `kman mcp` (cross-agent dispatch),
 |---|---|---|
 | `claude-code` | ✅ supported | requires `claude` on `PATH` (or `KMAN_CLAUDE_BIN`) |
 | `copilot-cli` | ✅ supported | requires `copilot` on `PATH` (or `KMAN_COPILOT_BIN`) |
-| `codex` / `gemini` | future | adapter shape is in place; not implemented |
+| `codex` / `gemini` | future | not implemented |
 
 kman is pre-1.0. The layout and flag surface may still change.

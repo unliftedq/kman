@@ -1,9 +1,8 @@
 # Hooks & MCP
 
 kman does not provide `mcp` or `hook` editing subcommands. Instead you edit the
-agent-directory files directly; they are mapped into the derived runtime plugin
-at launch. Format, events, environment variables, and path substitution all
-follow the Claude Code plugin spec.
+agent-directory files directly. At launch, kman passes those files to the
+selected runtime when that runtime supports the feature.
 
 The relevant per-agent files are:
 
@@ -11,14 +10,9 @@ The relevant per-agent files are:
 - `~/.kman/agents/<name>/hooks/hooks.json` — hook configuration.
 - `~/.kman/agents/<name>/scripts/` — hook / utility scripts referenced by `hooks.json`.
 
-> The materialized `~/.kman/runtime/<name>/.{claude,copilot}/` plugin is generated
-> output, rebuilt on each launch. Do **not** edit files there for persistent
-> customization — edit the agent-directory files above.
-
 ## Per-agent MCP servers — `mcp.json`
 
-Standard Claude Code plugin MCP configuration. It is materialized as `.mcp.json`
-inside the runtime plugin at launch:
+Use an `mcpServers` object for per-agent MCP servers:
 
 ```json
 {
@@ -36,7 +30,7 @@ inside the runtime plugin at launch:
 }
 ```
 
-- `mcp.json` is loaded by the backend through its Claude Code plugin support. If the backend does not support MCP servers, the configured servers are not started — but kman still validates the file's shape regardless of backend support (see next point).
+- If the selected runtime supports per-agent MCP servers, it loads this file for the agent. If it does not, the configured servers are not started — but kman still validates the file's shape regardless of runtime support (see next point).
 - If `mcp.json` references an invalid server or command shape, kman exits with code `2` before spawning the backend.
 
 > This file configures MCP servers that **the agent uses**. For making agents
@@ -44,47 +38,14 @@ inside the runtime plugin at launch:
 
 ## Hooks — `hooks/hooks.json`
 
-Hook configuration uses the Claude Code plugin hook format. Scripts live under
-`scripts/` and are referenced via `${CLAUDE_PLUGIN_ROOT}`:
+Hook configuration uses the selected runtime's hook format. Scripts live under
+`scripts/`; use the path and substitution variables documented by that runtime
+to reference them from `hooks.json`.
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/check-env.sh" }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/notify.sh" }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Supported hook events, types, and matcher semantics are exactly those defined by
-Claude Code's plugin hook system (see the
-[Plugins reference → Hooks](https://code.claude.com/docs/en/plugins-reference)).
-Backends that do not implement a given hook event silently ignore it. A hook
-that blocks execution causes kman to exit with code `3`.
-
-## Path substitution
-
-Inside plugin files you can use the runtime's substitution variables:
-
-- `${CLAUDE_PLUGIN_ROOT}` — the materialized plugin root.
-- `${CLAUDE_PLUGIN_DATA}` — the plugin data directory.
-- `${CLAUDE_PROJECT_DIR}` — the working directory of the run.
-- `${user_config.KEY}` — a value from the runtime's `userConfig`.
-- `${ENV_VAR}` — an environment variable from the launch environment.
+Supported hook events, types, matcher semantics, and substitution variables are
+defined by the selected runtime. Backends that do not implement a given hook
+event silently ignore it. A hook that blocks execution causes kman to exit with
+code `3`.
 
 ## Secrets
 
@@ -95,5 +56,4 @@ reference them via `${user_config.KEY}` / `${ENV_VAR}` in `mcp.json` and
 
 ## Related
 
-- Where these files land at launch: [Architecture](./architecture.md).
 - Diagnose hook/MCP problems: [Troubleshooting](./troubleshooting.md).

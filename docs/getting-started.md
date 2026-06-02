@@ -69,8 +69,8 @@ You can put the agent selector `-a / --agent` either **before** the subcommand
 
 ## What just happened
 
-1. `kman agent create coder` wrote `~/.kman/agents/coder/` containing **agent data only** — `agent.toml`, `soul.md`, and empty `skills/`, `hooks/`, `scripts/`, and `mcp.json` scaffolding. No plugin files are written into the agent directory.
-2. On `run` / `chat`, kman built an immutable `AgentContext` from the profile and soul, then **materialized** a runtime-native plugin under `~/.kman/runtime/coder/.claude` (or `.copilot`) and pointed the backend at it via `--plugin-dir`.
+1. `kman agent create coder` wrote `~/.kman/agents/coder/` containing the agent's editable data — `agent.toml`, `soul.md`, and empty `skills/`, `hooks/`, `scripts/`, and `mcp.json` scaffolding.
+2. On `run` / `chat`, kman built an immutable `AgentContext` from the profile and soul, prepared generated launch state under `~/.kman/runtime/coder/`, and started the selected runtime.
 3. The backend's stdout/stderr streamed straight back to your terminal. kman never sits in the I/O path, and session state stays in the backend's own storage.
 
 ## Next steps

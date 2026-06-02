@@ -4,7 +4,7 @@
 
 > Multi-agent management tool, *name is inspired by [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)* — a small society of named, well-tailored agents you can dispatch on a mission.
 
-`kman` sits *above* existing agent runtimes (Claude Code, GitHub Copilot CLI, ...) and gives each named agent its own isolated directory, soul prompt, skills, hooks, and MCP servers. One CLI to dispatch them all; one filesystem layout that every supported runtime can load — kman materializes each agent into the runtime's native plugin shape on demand.
+`kman` sits *above* existing agent runtimes (Claude Code, GitHub Copilot CLI, ...) and gives each named agent its own isolated directory, soul prompt, skills, hooks, and MCP servers. One CLI dispatches them all while keeping each agent's files separate and portable.
 
 See the [docs](docs/README.md) for the architecture and full usage guide, or jump straight to the published CLI: **[`@unliftedq/kman`](apps/cli/README.md)**.
 
@@ -18,14 +18,14 @@ Concretely, that buys you:
 - **Focus by construction.** An agent is defined by a single soul prompt plus a curated set of skills/tools. Because the surface area is intentionally narrow, the model is biased toward what it's actually good at instead of negotiating between dozens of half-relevant capabilities. You get specialists (`coder`, `reviewer`, `researcher`, `release-bot`, …) rather than one overworked generalist.
 - **Blast-radius isolation.** Permissions, MCP servers, and hooks are scoped per agent, not global. A `researcher` that browses the open web doesn't share credentials or write-access with a `release-bot` that can push tags. Misbehavior — accidental `rm -rf`, prompt injection from a fetched page, an over-eager tool call — is contained to the agent that was dispatched, not your whole toolchain.
 - **Backend-agnostic, profile-portable.** The same named agent profile runs on top of `claude-code` and `copilot-cli` today, with `codex` / `gemini` adapters tractable as future work. You isolate *the agent*, not *the vendor*: switching backends doesn't mean re-curating skills, hooks, and prompts from scratch.
-- **Reproducible and shareable.** Because every agent is just a directory of plain data — which kman materializes into a runtime-native plugin on demand — agents are versionable, diffable, and shareable. Teams can ship a `frontend-reviewer` the same way they ship a linter config, instead of passing around a 3-page system prompt in Notion.
+- **Reproducible and shareable.** Because every agent is just a directory of plain data, agents are versionable, diffable, and shareable. Teams can ship a `frontend-reviewer` the same way they ship a linter config, instead of passing around a 3-page system prompt in Notion.
 - **Composable instead of monolithic.** v1 keeps cross-agent composition simple — shell pipes between `kman run --agent ...` invocations — but the isolation boundary is the same one future multi-agent flows, desktop UIs, and remote gateways will build on. You don't have to re-architect later to get sub-agent delegation; the agents are already separate citizens.
 
 In short: **don't build one giant agent that knows everything. Build many small agents that each know one thing well, and let kman dispatch them.**
 
 ## How it works
 
-Every agent lives at `~/.kman/agents/<name>/` as a self-contained directory of agent data: a `soul.md` (the agent's character), an `agent.toml` profile (runtime, model, permissions), and per-agent skills, hooks, and MCP servers. At launch kman materializes that data into a runtime-native plugin under `~/.kman/runtime/<name>/.claude` or `.copilot` (plugin name fixed to `kman`) and points the backend at it — so the same agent runs on both Claude Code and Copilot CLI, with the soul arriving as a real system prompt instead of an ad-hoc injection.
+Every agent lives at `~/.kman/agents/<name>/` as a self-contained directory of agent data: a `soul.md` (the agent's character), an `agent.toml` profile (runtime, model, permissions), and per-agent skills, hooks, and MCP servers. At launch kman prepares the selected agent for the chosen runtime and passes the soul through the runtime's native agent mechanism, so it arrives as a real system prompt instead of an ad-hoc user message.
 
 ## Example agents
 
@@ -49,7 +49,7 @@ Browse the repo for concrete examples you can copy, adapt, or dispatch directly 
 |---|---|---|
 | `claude-code` | ✅ supported | requires `claude` on PATH (or `KMAN_CLAUDE_BIN`) |
 | `copilot-cli` | ✅ supported | requires `copilot` on PATH (or `KMAN_COPILOT_BIN`) |
-| `codex` / `gemini` | future | adapter shape is in place; not implemented |
+| `codex` / `gemini` | future | not implemented |
 
 Pre-1.0. Layout and flag surface may still change.
 

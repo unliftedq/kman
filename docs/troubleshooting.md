@@ -24,8 +24,8 @@ The v1 `doctor` runs:
   - `bin/` shadowing warnings,
   - the set of installed skills.
 
-Deeper integrations — `claude plugin validate`, `userConfig` ↔ env
-reconciliation, and deeper `mcp.json` semantic validation — are future work.
+Deeper integrations — `userConfig` ↔ env reconciliation and deeper `mcp.json`
+semantic validation — are future work.
 
 ## Exit codes
 
@@ -62,9 +62,8 @@ spawning the backend. Validate the JSON and the `mcpServers` entries; see
 ### A hook blocked the run (exit 3)
 
 A configured hook returned a blocking result. Inspect `hooks/hooks.json` and the
-referenced `scripts/`. Remember scripts are referenced via
-`${CLAUDE_PLUGIN_ROOT}` and must be executable (a `doctor` check flags
-non-executable hook scripts).
+referenced `scripts/`. Remember scripts must be executable (a `doctor` check flags non-executable hook
+scripts).
 
 ### Skill update refused
 
@@ -78,7 +77,7 @@ Executables in an agent's `bin/` become bare commands inside the backend's Bash
 tool and can shadow system commands. `doctor` warns about this; prefer an
 agent-specific prefix for `bin/` entries.
 
-### Stale runtime plugin
+### Stale generated runtime state
 
 The `~/.kman/runtime/<name>/` tree is derived state, rebuilt on each launch and
 safe to delete at any time. If something looks stale, delete it and re-run.

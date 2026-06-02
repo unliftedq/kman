@@ -54,7 +54,7 @@
 |---|---|---|
 | `claude-code` | ✅ 已支持 | 需 `claude` 在 PATH（或设置 `KMAN_CLAUDE_BIN`） |
 | `copilot-cli` | ✅ 已支持 | 需 `copilot` 在 PATH（或设置 `KMAN_COPILOT_BIN`） |
-| `codex` / `gemini` | 规划中 | 适配层预留，尚未实现 |
+| `codex` / `gemini` | 规划中 | 尚未实现 |
 
 > 当前仍是 pre-1.0，目录结构与参数接口可能调整。
 

@@ -35,9 +35,9 @@ kman agent delete <name> [--yes]
 
 `agent create` scaffolds an agent directory with **agent data only**
 (`agent.toml`, `soul.md` with its `name:` frontmatter, `skills/`, `hooks/`,
-`scripts/`, `mcp.json`). It does **not** write plugin scaffolding — those files
-are derived at launch under `~/.kman/runtime/<name>/`. `agent delete` /
-`agent rename` also drop the matching runtime directory.
+`scripts/`, `mcp.json`). Runtime-specific launch state is generated separately
+under `~/.kman/runtime/<name>/`. `agent delete` / `agent rename` also drop the
+matching runtime directory.
 
 When `--runtime` / `--model` (and the `defaults.*` fields) are omitted, the new
 profile is seeded from `~/.kman/config.json` (see [Configuration](./configuration.md)),
