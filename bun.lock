@@ -13,7 +13,7 @@
     },
     "apps/cli": {
       "name": "@unliftedq/kman",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "bin": {
         "kman": "dist/main.js",
       },
@@ -30,7 +30,7 @@
     },
     "apps/site": {
       "name": "@kman/site",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "dependencies": {
         "@phosphor-icons/react": "^2.1.7",
         "mermaid": "^11.15.0",
