@@ -3,9 +3,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ----------------------------------------------------------------------------
-   Design tokens. One neutral system (zinc-ish) + one locked accent (amber).
-   Light uses a deeper burnt-amber for AA contrast; dark uses a brighter amber.
-   Same accent family across the whole page.
+   Design tokens. One neutral system (zinc-ish), monochrome accent that tracks
+   the brand mark: ink-black on light, near-white on dark. The primary is the
+   same color as the logo, so the mark and the calls-to-action read as one
+   system. Syntax-highlight tokens stay colored for code legibility.
 ---------------------------------------------------------------------------- */
 :root {
   --bg: #fbfbfa;
@@ -16,10 +17,10 @@
   --fg-faint: #9a9a92;
   --line: #e7e6e1;
   --line-strong: #d8d7d1;
-  --accent: #c2410c;
-  --accent-hover: #9a3412;
+  --accent: #1b1b19;
+  --accent-hover: #343330;
   --accent-fg: #ffffff;
-  --accent-soft: rgba(194, 65, 12, 0.09);
+  --accent-soft: rgba(27, 27, 25, 0.08);
   --code-bg: #f5f5f2;
 
   --c-comment: var(--fg-faint);
@@ -41,10 +42,10 @@
   --fg-faint: #6a6a6e;
   --line: #222226;
   --line-strong: #2f2f34;
-  --accent: #fb923c;
-  --accent-hover: #fdba74;
-  --accent-fg: #1a1206;
-  --accent-soft: rgba(251, 146, 60, 0.12);
+  --accent: #ededec;
+  --accent-hover: #ffffff;
+  --accent-fg: #0a0a0b;
+  --accent-soft: rgba(237, 237, 236, 0.12);
   --code-bg: #111114;
 
   --c-comment: var(--fg-faint);
@@ -251,6 +252,28 @@ samp {
   border: 0;
   padding: 0;
   color: var(--fg);
+}
+
+/* Mermaid diagrams */
+.prose .mermaid-diagram {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 1.6rem;
+  padding: 1.4rem 1.2rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+.prose .mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.prose .mermaid-diagram :is(.nodeLabel, .edgeLabel, .label) {
+  font-family: var(--font-sans);
+}
+.prose .mermaid-diagram .edgeLabel {
+  background: var(--bg-elevated);
 }
 
 /* Tables */
