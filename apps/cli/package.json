@@ -1,6 +1,6 @@
 {
   "name": "@unliftedq/kman",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Multi-agent management tool — a CLI that manages a roster of named agent profiles on top of existing agent runtimes (claude-code, copilot-cli, ...).",
   "keywords": [
     "agent",
