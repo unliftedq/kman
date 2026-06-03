@@ -40,13 +40,13 @@ function Hero() {
             Manners maketh man. Tailoring maketh agents.
           </p>
           <h1 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-fg sm:text-5xl lg:text-6xl">
-            Build small agents.
+            Build focused agents.
             <br />
-            Dispatch the right one.
+            Run them as a team.
           </h1>
-          <p className="mt-6 max-w-[40ch] text-lg leading-relaxed text-fg-muted">
-            kman gives each named agent its own isolated directory: soul, skills, hooks, and MCP
-            servers. One CLI runs them all.
+          <p className="mt-6 max-w-[42ch] text-lg leading-relaxed text-fg-muted">
+            Give every agent its own home: a soul prompt, plus its own skills, hooks, and MCP
+            servers. kman keeps them isolated and runs the whole team from one CLI.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link
@@ -83,7 +83,8 @@ function Hero() {
             ]}
           />
           <p className="mt-3 px-1 font-mono text-xs text-fg-faint">
-            Backend-agnostic. Runs on claude-code and copilot-cli today.
+            Works with the agent runtimes you already use. Right now that&apos;s Claude Code and
+            Copilot CLI.
           </p>
         </div>
       </div>
@@ -102,8 +103,8 @@ function Backends() {
     <section className="border-b border-line">
       <div className="mx-auto flex max-w-[1240px] flex-col gap-8 px-5 py-12 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <p className="max-w-sm text-sm leading-relaxed text-fg-muted">
-          kman never calls a model itself. It sits above the agent runtimes you already use and
-          dispatches the right specialist.
+          kman never talks to a model itself. It sits on top of the runtimes you already know and
+          sends each job to the agent built for it.
         </p>
         <div className="flex flex-wrap items-center gap-x-10 gap-y-6">
           {runtimes.map((r) => (
@@ -125,7 +126,7 @@ function Backends() {
               <span className="text-sm font-medium text-fg">{r.name}</span>
             </div>
           ))}
-          <span className="text-sm text-fg-faint">codex / gemini coming soon</span>
+          <span className="text-sm text-fg-faint">Codex and Gemini coming soon</span>
         </div>
       </div>
     </section>
@@ -143,49 +144,50 @@ function WhyKman() {
             Why kman
           </span>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-            Agent-level isolation, not skill bloat.
+            A team beats one big assistant.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-fg-muted">
-            One omniscient assistant stops scaling. A small society of narrow, well-tailored agents
-            keeps every run focused, cheap, and contained.
+            Pile every skill and tool into a single assistant and it slows down, runs up the bill,
+            and loses the thread. A handful of narrow agents keeps each run focused and cheap, and
+            keeps mistakes from spreading.
           </p>
         </div>
 
         <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <FeatureCell
             icon={<Stack size={22} weight="duotone" />}
-            title="Context isolation, not skill bloat"
-            body="Each agent only sees its own ~/.kman/agents/<name>/ directory. Skills aren't merged into one giant catalog, so a coder never pays tokens for a researcher's tools."
+            title="Context stays small"
+            body="Each agent sees only its own ~/.kman/agents/<name>/ directory. Skills never pile into one giant catalog, so a coder never pays tokens for a researcher's tools."
           />
 
           <FeatureCell
             icon={<Target size={22} weight="duotone" />}
-            title="Focus by construction"
-            body="A single soul prompt plus a curated set of tools. Narrow surface area biases the model toward what it's actually good at."
+            title="Focused by design"
+            body="One soul prompt and a short, curated set of tools. A small surface area keeps the model on the work it's actually good at."
           />
 
           <FeatureCell
             icon={<ShieldCheck size={22} weight="duotone" />}
-            title="Blast-radius isolation"
-            body="Permissions, MCP servers, and hooks are scoped per agent. A web-browsing researcher never shares write-access with a release-bot."
+            title="Contained blast radius"
+            body="Permissions, MCP servers, and hooks are scoped to each agent. Your web-browsing researcher never gets the release bot's write access."
           />
 
           <FeatureCell
             icon={<ArrowsLeftRight size={22} weight="duotone" />}
             title="Backend-agnostic"
-            body="The same profile runs on claude-code and copilot-cli. You isolate the agent, not the vendor."
+            body="The same agent profile runs on Claude Code or Copilot CLI, so you can switch runtimes without rebuilding your agents."
           />
 
           <FeatureCell
             icon={<Package size={22} weight="duotone" />}
-            title="Reproducible & shareable"
-            body="Every agent is plain data on disk: versionable, diffable, shippable like a linter config."
+            title="Plain files on disk"
+            body="Every agent is just data on disk. Version it, diff it, and share it like any other config file."
           />
 
           <FeatureCell
             icon={<PuzzlePiece size={22} weight="duotone" />}
-            title="Composable"
-            body="Pipe one kman run into the next today; the same isolation boundary powers future multi-agent flows."
+            title="Built to compose"
+            body="Pipe one kman run into the next today. The same isolation boundary will power richer multi-agent flows as they land."
           />
         </div>
       </div>
@@ -217,17 +219,17 @@ function HowItWorks() {
   const steps = [
     {
       verb: "Create",
-      desc: "Scaffold a named agent directory: profile, soul, skills, hooks, all its own.",
+      desc: "Scaffold a named agent with its own profile, soul, skills, and hooks.",
       lines: ["$ kman agent create coder"],
     },
     {
       verb: "Tailor",
-      desc: "The soul.md body becomes the system prompt. Shape how the agent thinks.",
+      desc: "Edit soul.md to set the system prompt and shape how the agent thinks.",
       lines: ["$ $EDITOR ~/.kman/agents/coder/soul.md"],
     },
     {
       verb: "Dispatch",
-      desc: "Run a one-shot task, or let agents discover and call each other over MCP.",
+      desc: "Run a one-off task, or let your agents find and call each other over MCP.",
       lines: ['$ kman -a coder run --task "Ship it."'],
     },
   ];
@@ -236,7 +238,7 @@ function HowItWorks() {
     <section className="border-b border-line bg-bg-subtle">
       <div className="mx-auto max-w-[1240px] px-5 py-20 lg:px-8 lg:py-28">
         <h2 className="max-w-xl text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-          From clean machine to a running agent.
+          From a fresh machine to a working agent.
         </h2>
 
         <div className="mt-12 flex flex-col divide-y divide-line border-y border-line">
@@ -267,8 +269,8 @@ function Manifesto() {
       <div className="mx-auto max-w-3xl px-5 py-24 text-center lg:py-32">
         <Logo className="mx-auto h-9 w-9 text-accent" />
         <blockquote className="mt-8 text-2xl font-medium leading-snug tracking-tight text-fg sm:text-3xl">
-          Don&apos;t build one giant agent that knows everything. Build many small agents that each
-          know one thing well, and let kman dispatch them.
+          Stop building one giant agent that has to know everything. Build a team of small agents
+          that each do one thing well, and let kman put the right one on the job.
         </blockquote>
       </div>
     </section>
@@ -368,7 +370,7 @@ function FinalCta() {
               Dispatch your first agent.
             </h2>
             <p className="mt-4 max-w-md text-lg leading-relaxed text-fg-muted">
-              Install the CLI, scaffold an agent, and put a specialist on the job in three commands.
+              Install the CLI, create an agent, and put a specialist to work in three commands.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
