@@ -63,10 +63,8 @@ export function buildSkillsCommand(): Command {
         return;
       }
       for (const s of skills) {
-        const src = s.manifest?.source ?? 'local';
-        const ref = s.manifest?.ref ? `@${s.manifest.ref}` : '';
         const desc = s.description ? truncate(s.description) : '';
-        process.stdout.write(`${s.name}\t${desc}\t${src}${ref}\n`);
+        process.stdout.write(`${s.name}\t${desc}\n`);
       }
     });
 
