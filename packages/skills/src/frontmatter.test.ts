@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { extractDescription, readSkillDescription, truncate } from './frontmatter.js';
@@ -27,6 +27,11 @@ describe('extractDescription', () => {
 
   test('returns undefined for an empty description', () => {
     expect(extractDescription('---\ndescription: \n---\n')).toBeUndefined();
+  });
+
+  test('returns undefined for block scalar descriptions', () => {
+    expect(extractDescription('---\ndescription: |\n  multi-line\n---\n')).toBeUndefined();
+    expect(extractDescription('---\ndescription: >-\n  folded\n---\n')).toBeUndefined();
   });
 
   test('tolerates a leading BOM', () => {
@@ -65,6 +70,16 @@ describe('readSkillDescription', () => {
     const dir = await mkdtemp(join(tmpdir(), 'kman-fm-'));
     try {
       expect(await readSkillDescription(dir)).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('rethrows non-ENOENT read errors', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kman-fm-'));
+    try {
+      await mkdir(join(dir, 'SKILL.md'));
+      await expect(readSkillDescription(dir)).rejects.toHaveProperty('code', 'EISDIR');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

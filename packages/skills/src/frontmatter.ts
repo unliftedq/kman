@@ -12,8 +12,9 @@ export async function readSkillDescription(skillDir: string): Promise<string | u
   let raw: string;
   try {
     raw = await readFile(join(skillDir, SKILL_FILENAME), 'utf8');
-  } catch {
-    return undefined;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
   }
   return extractDescription(raw);
 }
@@ -28,6 +29,7 @@ export function extractDescription(raw: string): string | undefined {
   const match = /^description:\s*(.*)$/m.exec(frontmatter);
   if (!match || match[1] === undefined) return undefined;
   let value = match[1].trim();
+  if (/^[|>](?:[+-]?\d*|\d*[+-]?)$/.test(value)) return undefined;
   if (
     (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
     (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
