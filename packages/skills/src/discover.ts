@@ -1,6 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import { UserError } from '@kman/types';
+import { readSkillDescription } from './frontmatter.js';
 
 export interface DiscoveredSkill {
   /** Skill name derived from its directory basename. */
@@ -9,6 +10,8 @@ export interface DiscoveredSkill {
   dir: string;
   /** Path of dir relative to the materialized source root. */
   relPath: string;
+  /** Description from the SKILL.md frontmatter, if present. */
+  description?: string;
 }
 
 const COMMON_ROOTS = ['', 'skills', '.claude/skills'];
@@ -30,7 +33,7 @@ export async function discoverSkills(rootDir: string, subpath?: string): Promise
   const found: DiscoveredSkill[] = [];
   if (await hasSkillMd(anchor)) {
     found.push({ name: basename(anchor), dir: anchor, relPath: relative(rootDir, anchor) || '.' });
-    return found;
+    return enrich(found);
   }
 
   // 2. Common skill roots.
@@ -42,7 +45,7 @@ export async function discoverSkills(rootDir: string, subpath?: string): Promise
     for (const d of direct) {
       found.push({ name: basename(d), dir: d, relPath: relative(rootDir, d) });
     }
-    if (found.length > 0) return dedupe(found);
+    if (found.length > 0) return enrich(dedupe(found));
   }
 
   // 3. Bounded recursive search.
@@ -50,7 +53,18 @@ export async function discoverSkills(rootDir: string, subpath?: string): Promise
   if (found.length === 0) {
     throw new UserError(`No SKILL.md found anywhere under ${anchor}.`);
   }
-  return dedupe(found);
+  return enrich(dedupe(found));
+}
+
+/** Populate each skill's `description` from its SKILL.md frontmatter. */
+async function enrich(list: DiscoveredSkill[]): Promise<DiscoveredSkill[]> {
+  await Promise.all(
+    list.map(async (s) => {
+      const description = await readSkillDescription(s.dir);
+      if (description !== undefined) s.description = description;
+    }),
+  );
+  return list;
 }
 
 async function listSkillDirs(parent: string): Promise<string[]> {

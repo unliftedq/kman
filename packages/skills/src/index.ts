@@ -6,3 +6,4 @@ export * from './update.js';
 export * from './remove.js';
 export * from './list.js';
 export * from './fetch.js';
+export * from './frontmatter.js';

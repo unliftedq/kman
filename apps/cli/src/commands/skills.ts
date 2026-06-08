@@ -5,6 +5,7 @@ import {
   materialize,
   parseSource,
   removeSkill,
+  truncate,
   updateSkill,
   vendorSkill,
   type DiscoveredSkill,
@@ -42,6 +43,9 @@ export function buildSkillsCommand(): Command {
             force: opts.force === true,
           });
           process.stdout.write(`Installed ${skill.name} → ${res.installedPath}\n`);
+          if (skill.description) {
+            process.stdout.write(`  ${truncate(skill.description)}\n`);
+          }
         }
       } finally {
         await mat.cleanup();
@@ -61,7 +65,8 @@ export function buildSkillsCommand(): Command {
       for (const s of skills) {
         const src = s.manifest?.source ?? 'local';
         const ref = s.manifest?.ref ? `@${s.manifest.ref}` : '';
-        process.stdout.write(`${s.name}\t${src}${ref}\n`);
+        const desc = s.description ? truncate(s.description) : '';
+        process.stdout.write(`${s.name}\t${desc}\t${src}${ref}\n`);
       }
     });
 
@@ -77,6 +82,7 @@ export function buildSkillsCommand(): Command {
         throw new UserError(`Skill "${opts.skill}" not installed for agent "${agent}".`);
       }
       process.stdout.write(`name:         ${match.name}\n`);
+      if (match.description) process.stdout.write(`description:  ${match.description}\n`);
       process.stdout.write(`directory:    ${match.dir}\n`);
       if (match.manifest) {
         process.stdout.write(`source:       ${match.manifest.source}\n`);
@@ -158,7 +164,11 @@ async function selectSkills(
 async function pickInteractive(discovered: DiscoveredSkill[]): Promise<DiscoveredSkill[]> {
   return multiSelectInteractive<DiscoveredSkill>({
     message: `Select skills to install (${discovered.length} discovered)`,
-    items: discovered.map((s) => ({ value: s, label: s.name, hint: s.relPath })),
+    items: discovered.map((s) => ({
+      value: s,
+      label: s.name,
+      hint: s.description ? truncate(s.description) : s.relPath,
+    })),
   });
 }
 
