@@ -1,4 +1,3 @@
-import type { Server } from 'bun';
 import { rm } from 'node:fs/promises';
 import {
   ROUTES,
@@ -34,7 +33,7 @@ const VALID_STATUSES: ReadonlySet<string> = new Set<TaskStatus>([
 export class IpcServer {
   private readonly api: DaemonApi;
   private endpoint: IpcEndpoint;
-  private server?: Server;
+  private server?: ReturnType<typeof Bun.serve>;
 
   constructor(opts: IpcServerOptions) {
     this.api = opts.api;
@@ -58,7 +57,11 @@ export class IpcServer {
         fetch: (req) => this.handle(req),
       });
       // Capture the OS-assigned port when binding to 0.
-      this.endpoint = { kind: 'tcp', host: this.endpoint.host, port: this.server.port };
+      this.endpoint = {
+        kind: 'tcp',
+        host: this.endpoint.host,
+        port: this.server.port ?? this.endpoint.port,
+      };
     }
   }
 
