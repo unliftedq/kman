@@ -90,8 +90,14 @@ export class IpcClient {
   }
 
   async shutdown(): Promise<void> {
-    const res = await this.fetch(ROUTES.shutdown, { method: 'POST' });
-    if (!res.ok) throw await this.error(res);
+    try {
+      const res = await this.fetch(ROUTES.shutdown, { method: 'POST' });
+      if (!res.ok) throw await this.error(res);
+    } catch (err) {
+      // The daemon dropping the connection as it exits is the success case, not
+      // a failure — only rethrow if it was something other than going away.
+      if (!(err instanceof DaemonUnavailableError)) throw err;
+    }
   }
 
   private async getJson<T>(path: string): Promise<T> {

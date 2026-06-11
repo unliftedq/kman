@@ -114,7 +114,9 @@ export class IpcServer {
       return json(rec, 201);
     }
     if (path === ROUTES.shutdown && method === 'POST') {
-      await this.api.shutdown();
+      // Reply first, then tear down: stopping the server inline would kill this
+      // very connection before the client could read the response.
+      setTimeout(() => void this.api.shutdown(), 10);
       return json({ ok: true });
     }
 

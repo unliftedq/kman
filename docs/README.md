@@ -18,6 +18,7 @@ These docs describe how to install, configure, and operate kman, plus the archit
 | Add or update skills | [Skills](./skills.md) |
 | Wire hooks and per-agent MCP servers | [Hooks & MCP](./hooks-and-mcp.md) |
 | Let agents call each other | [Multi-Agent Dispatch](./multi-agent.md) |
+| Run tasks in the background on a schedule | [Daemon & Task Scheduling](./daemon.md) |
 | Set global defaults and environment variables | [Configuration](./configuration.md) |
 | Diagnose a problem | [Troubleshooting](./troubleshooting.md) |
 
@@ -31,8 +32,9 @@ These docs describe how to install, configure, and operate kman, plus the archit
 6. [Skills](./skills.md) — discovering, installing, pinning, and updating skills.
 7. [Hooks & MCP](./hooks-and-mcp.md) — per-agent `hooks/hooks.json`, `scripts/`, and `mcp.json`.
 8. [Multi-Agent Dispatch](./multi-agent.md) — cross-agent invocation via the kman MCP server and shell composition.
-9. [Configuration](./configuration.md) — `~/.kman/config.json` defaults and environment variables.
-10. [Troubleshooting](./troubleshooting.md) — `kman doctor`, exit codes, and common failures.
+9. [Daemon & Task Scheduling](./daemon.md) — the resident daemon, task queue, OS hosts, and tray.
+10. [Configuration](./configuration.md) — `~/.kman/config.json` defaults and environment variables.
+11. [Troubleshooting](./troubleshooting.md) — `kman doctor`, exit codes, and common failures.
 
 ## Project at a glance
 

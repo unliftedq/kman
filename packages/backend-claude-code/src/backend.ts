@@ -50,7 +50,9 @@ export class ClaudeCodeBackend implements Backend {
     // Piped mode (used by the daemon) ignores stdin and exposes stdout/stderr
     // so the caller can capture output to a log file.
     const options =
-      opts?.stdio === 'pipe' ? { stdio: ['ignore', 'pipe', 'pipe'] as const } : undefined;
+      opts?.stdio === 'pipe'
+        ? { stdio: ['ignore', 'pipe', 'pipe'] as ('ignore' | 'pipe')[] }
+        : undefined;
     return spawnBackend(ctx, { command: this.binary, args, ...(options ? { options } : {}) });
   }
 

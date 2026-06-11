@@ -142,6 +142,8 @@ describe('IPC server + client', () => {
 
   test('shutdown is forwarded to the api', async () => {
     await client().shutdown();
+    // The server replies before tearing down, then invokes shutdown shortly after.
+    await new Promise((r) => setTimeout(r, 50));
     expect(api.shutdownCalled).toBe(true);
   });
 
