@@ -84,6 +84,7 @@ Cycle protection (`KMAN_RUN_CHAIN`) prevents `a → b → a` loops; depth is cap
 ├── packages/                      # all internal, all private (not published)
 │   ├── types                      # @kman/types — shared interfaces
 │   ├── core                       # @kman/core — profile, context, prompt, launcher, doctor
+│   ├── daemon                     # @kman/daemon — resident task daemon, scheduler, IPC, OS hosts
 │   ├── skills                     # @kman/skills — fetch + vendor SKILL.md sources
 │   ├── backend-base               # @kman/backend-base — spawn helpers
 │   ├── backend-claude-code        # @kman/backend-claude-code

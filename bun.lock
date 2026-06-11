@@ -21,6 +21,7 @@
         "@kman/backend-claude-code": "workspace:*",
         "@kman/backend-copilot-cli": "workspace:*",
         "@kman/core": "workspace:*",
+        "@kman/daemon": "workspace:*",
         "@kman/mcp-server": "workspace:*",
         "@kman/skills": "workspace:*",
         "@kman/types": "workspace:*",
@@ -96,6 +97,17 @@
       },
       "devDependencies": {
         "@types/iarna__toml": "^2.0.5",
+        "typescript": "^5.6.0",
+      },
+    },
+    "packages/daemon": {
+      "name": "@kman/daemon",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kman/core": "workspace:*",
+        "@kman/types": "workspace:*",
+      },
+      "devDependencies": {
         "typescript": "^5.6.0",
       },
     },
@@ -213,6 +225,8 @@
     "@kman/backend-copilot-cli": ["@kman/backend-copilot-cli@workspace:packages/backend-copilot-cli"],
 
     "@kman/core": ["@kman/core@workspace:packages/core"],
+
+    "@kman/daemon": ["@kman/daemon@workspace:packages/daemon"],
 
     "@kman/mcp-server": ["@kman/mcp-server@workspace:packages/mcp-server"],
 

@@ -9,6 +9,8 @@ import { buildChatCommand } from './commands/chat.js';
 import { buildVersionCommand } from './commands/version.js';
 import { buildDoctorCommand } from './commands/doctor.js';
 import { buildMcpCommand } from './commands/mcp.js';
+import { buildDaemonCommand } from './commands/daemon.js';
+import { buildTaskCommand } from './commands/task.js';
 import { extractAgentOption } from './common/agent-option.js';
 
 function die(err: unknown): never {
@@ -55,6 +57,8 @@ program.addCommand(buildChatCommand());
 program.addCommand(buildVersionCommand());
 program.addCommand(buildDoctorCommand());
 program.addCommand(buildMcpCommand());
+program.addCommand(buildDaemonCommand());
+program.addCommand(buildTaskCommand());
 
 let rawArgs: string[];
 try {

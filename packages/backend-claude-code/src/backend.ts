@@ -44,10 +44,16 @@ export class ClaudeCodeBackend implements Backend {
     return PERMISSION_MAP[level] ?? 'default';
   }
 
-  async spawn(ctx: AgentContext, _opts?: RunOptions): Promise<ChildProcess> {
+  async spawn(ctx: AgentContext, opts?: RunOptions): Promise<ChildProcess> {
     const { pluginDir, pluginAgent } = await materializeRuntimePlugin(ctx.profile, 'claude');
     const args = this.buildArgs(ctx, pluginDir, pluginAgent, /* interactive */ false);
-    return spawnBackend(ctx, { command: this.binary, args });
+    // Piped mode (used by the daemon) ignores stdin and exposes stdout/stderr
+    // so the caller can capture output to a log file.
+    const options =
+      opts?.stdio === 'pipe'
+        ? { stdio: ['ignore', 'pipe', 'pipe'] as ('ignore' | 'pipe')[] }
+        : undefined;
+    return spawnBackend(ctx, { command: this.binary, args, ...(options ? { options } : {}) });
   }
 
   async chat(ctx: AgentContext, _opts?: ChatOptions): Promise<ChildProcess> {
