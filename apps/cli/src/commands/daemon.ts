@@ -1,13 +1,6 @@
 import { spawn } from 'node:child_process';
 import { Command } from 'commander';
-import {
-  Daemon,
-  Tray,
-  openLogsFolder,
-  selectHost,
-  type DaemonStatus,
-  type TrayAction,
-} from '@kman/daemon';
+import { Daemon, selectHost, type DaemonStatus } from '@kman/daemon';
 import { ExitCode, UserError } from '@kman/types';
 import pkg from '../../package.json' with { type: 'json' };
 import { createRunManager, daemonExec, getClient } from '../common/daemon-runtime.js';
@@ -20,22 +13,20 @@ export function buildDaemonCommand(): Command {
   cmd
     .command('run')
     .description('Run the daemon in the foreground (used by the OS host).')
-    .option('--tray', 'Also show a system-tray menu (desktop platforms).')
-    .action(async (opts: { tray?: boolean }) => {
-      await runDaemon(opts.tray === true);
+    .action(async () => {
+      await runDaemon();
     });
 
   cmd
     .command('start')
     .description('Start the daemon in the background.')
-    .option('--tray', 'Launch with a system-tray menu.')
-    .action(async (opts: { tray?: boolean }) => {
+    .action(async () => {
       const existing = await getClient();
       if (existing) {
         process.stdout.write('kman daemon is already running.\n');
         return;
       }
-      const exec = daemonExec(opts.tray ? ['--tray'] : []);
+      const exec = daemonExec();
       const child = spawn(exec.command, exec.args, {
         detached: true,
         stdio: 'ignore',
@@ -65,14 +56,13 @@ export function buildDaemonCommand(): Command {
   cmd
     .command('restart')
     .description('Restart the daemon.')
-    .option('--tray', 'Launch with a system-tray menu.')
-    .action(async (opts: { tray?: boolean }) => {
+    .action(async () => {
       const client = await getClient();
       if (client) {
         await client.shutdown();
         await waitForStopped(5000);
       }
-      const exec = daemonExec(opts.tray ? ['--tray'] : []);
+      const exec = daemonExec();
       const child = spawn(exec.command, exec.args, { detached: true, stdio: 'ignore', windowsHide: true });
       child.unref();
       if (!(await waitForHealth(5000))) {
@@ -104,9 +94,8 @@ export function buildDaemonCommand(): Command {
     .command('install')
     .description('Register the daemon to start automatically at login (OS host).')
     .option('--start', 'Also start the daemon now.')
-    .option('--tray', 'Use the tray host variant (desktop platforms).')
-    .action(async (opts: { start?: boolean; tray?: boolean }) => {
-      const host = selectHost(daemonExec(opts.tray ? ['--tray'] : []));
+    .action(async (opts: { start?: boolean }) => {
+      const host = selectHost(daemonExec());
       await host.install();
       process.stdout.write(`Installed kman daemon host: ${host.label}.\n`);
       if (opts.start) {
@@ -127,7 +116,7 @@ export function buildDaemonCommand(): Command {
   return cmd;
 }
 
-async function runDaemon(withTray: boolean): Promise<void> {
+async function runDaemon(): Promise<void> {
   const existing = await getClient();
   if (existing) {
     throw new UserError('kman daemon is already running.');
@@ -140,20 +129,6 @@ async function runDaemon(withTray: boolean): Promise<void> {
   });
   await daemon.start();
 
-  let tray: Tray | undefined;
-  if (withTray) {
-    tray = new Tray({
-      getStatus: async () => daemon.status(),
-      onAction: (action: TrayAction) => handleTrayAction(action, daemon),
-    });
-    const started = await tray.start();
-    if (!started) {
-      process.stderr.write(
-        'kman: tray helper not available (set KMAN_SYSTRAY_BIN); running headless.\n',
-      );
-    }
-  }
-
   const shutdown = () => void daemon.shutdown();
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
@@ -161,20 +136,6 @@ async function runDaemon(withTray: boolean): Promise<void> {
   const endpoint = daemon.endpoint;
   const where = endpoint.kind === 'unix' ? endpoint.path : `127.0.0.1:${endpoint.port}`;
   process.stdout.write(`kman daemon running (pid ${process.pid}) on ${where}\n`);
-}
-
-function handleTrayAction(action: TrayAction, daemon: Daemon): void {
-  switch (action) {
-    case 'open-logs':
-      openLogsFolder();
-      break;
-    case 'stop':
-    case 'quit':
-      void daemon.shutdown();
-      break;
-    default:
-      break;
-  }
 }
 
 function formatStatus(s: DaemonStatus): string {

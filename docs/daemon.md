@@ -10,8 +10,8 @@ The daemon's lifecycle is owned by an OS-native **host**:
 | Platform | Host |
 |---|---|
 | Linux | `systemd --user` service |
-| macOS | `launchd` LaunchAgent (+ optional tray) |
-| Windows | per-user registry autostart (+ optional tray) |
+| macOS | `launchd` LaunchAgent |
+| Windows | per-user registry autostart (silent, no console window) |
 
 ## Quick start
 
@@ -72,19 +72,13 @@ Either way the resolved endpoint and a per-daemon auth token are recorded in
 `~/.kman/daemon/state.json`; the CLI reads it to connect. The socket file
 permissions and the token gate access — the daemon is local-only.
 
-## Tray (macOS / Windows)
+## Windows autostart (silent)
 
-On desktop platforms the daemon can show a system-tray menu (status, start/stop,
-open logs, quit):
-
-```bash
-kman daemon start --tray
-kman daemon install --tray   # autostart with the tray
-```
-
-The tray is driven by a lightweight `systray`-style helper binary over stdio.
-Point kman at it with `KMAN_SYSTRAY_BIN=/path/to/helper`. When no helper is
-configured the daemon runs headless and the tray is simply skipped.
+On Windows, `kman daemon install` registers a per-user `HKCU\…\Run` entry that
+launches the daemon at login through a generated hidden VBScript shim
+(`~/.kman/daemon/autostart.vbs`) via `wscript.exe`. The daemon starts in the
+background with no console window. `kman daemon uninstall` removes both the
+registry entry and the shim.
 
 ## Command reference
 
@@ -92,12 +86,12 @@ configured the daemon runs headless and the tray is simply skipped.
 
 | Command | Description |
 |---|---|
-| `run [--tray]` | Run in the foreground (this is what the OS host execs). |
-| `start [--tray]` | Spawn the daemon detached and wait for it to become healthy. |
+| `run` | Run in the foreground (this is what the OS host execs). |
+| `start` | Spawn the daemon detached and wait for it to become healthy. |
 | `stop` | Graceful shutdown. |
-| `restart [--tray]` | Stop (if running) then start. |
+| `restart` | Stop (if running) then start. |
 | `status [--json]` | Show pid, version, concurrency, and task counts. |
-| `install [--host …] [--start] [--tray]` | Register the OS autostart host. |
+| `install [--start]` | Register the OS autostart host. |
 | `uninstall` | Remove the autostart registration. |
 
 ### `kman task`

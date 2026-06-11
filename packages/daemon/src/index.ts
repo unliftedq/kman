@@ -11,4 +11,3 @@ export * from './server/ipc-server.js';
 export * from './client/ipc-client.js';
 export * from './daemon.js';
 export * from './host/index.js';
-export * from './tray/tray.js';

@@ -32,7 +32,7 @@ These docs describe how to install, configure, and operate kman, plus the archit
 6. [Skills](./skills.md) — discovering, installing, pinning, and updating skills.
 7. [Hooks & MCP](./hooks-and-mcp.md) — per-agent `hooks/hooks.json`, `scripts/`, and `mcp.json`.
 8. [Multi-Agent Dispatch](./multi-agent.md) — cross-agent invocation via the kman MCP server and shell composition.
-9. [Daemon & Task Scheduling](./daemon.md) — the resident daemon, task queue, OS hosts, and tray.
+9. [Daemon & Task Scheduling](./daemon.md) — the resident daemon, task queue, and OS hosts.
 10. [Configuration](./configuration.md) — `~/.kman/config.json` defaults and environment variables.
 11. [Troubleshooting](./troubleshooting.md) — `kman doctor`, exit codes, and common failures.
 

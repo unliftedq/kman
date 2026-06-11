@@ -52,10 +52,10 @@ function escapeXml(s: string): string {
     .replace(/>/g, '&gt;');
 }
 
-/** macOS host backed by a launchd LaunchAgent. The tray runs inside the daemon process (`--tray`). */
+/** macOS host backed by a launchd LaunchAgent that runs the daemon at login. */
 export class LaunchdHost implements Host {
   readonly name = 'launchd';
-  readonly label = 'launchd (LaunchAgent + tray)';
+  readonly label = 'launchd (LaunchAgent)';
   constructor(private readonly daemonExec: DaemonExec) {}
 
   async install(): Promise<void> {

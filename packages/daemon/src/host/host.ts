@@ -1,7 +1,7 @@
 /**
  * How the OS launches the daemon. `command` is the executable (e.g. `kman` or
  * an absolute path to a launcher) and `args` are appended (typically
- * `['daemon', 'run']`, plus `--tray` on desktop platforms).
+ * `['daemon', 'run']`).
  */
 export interface DaemonExec {
   command: string;
@@ -19,8 +19,8 @@ export interface HostStatus {
 
 /**
  * A platform integration that owns the daemon's lifecycle at the OS level:
- * systemd user service (Linux), launchd agent + tray (macOS), registry
- * autostart + tray (Windows). Each method maps to a `kman daemon install/...`
+ * systemd user service (Linux), launchd agent (macOS), registry autostart
+ * (Windows). Each method maps to a `kman daemon install/...`
  * subcommand.
  */
 export interface Host {
