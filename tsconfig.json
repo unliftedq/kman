@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/types" },
     { "path": "./packages/core" },
+    { "path": "./packages/daemon" },
     { "path": "./packages/skills" },
     { "path": "./packages/backend-base" },
     { "path": "./packages/backend-claude-code" },
