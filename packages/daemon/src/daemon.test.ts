@@ -80,6 +80,48 @@ describe('Daemon lifecycle', () => {
     await d.shutdown();
   });
 
+  test('rejects a delegation that would form a cross-agent cycle', async () => {
+    const run = new FakeRunManager();
+    const d = makeDaemon(run);
+    await d.start();
+
+    // a (root) → b → a should be refused at submit time.
+    const a = await d.submit({ agent: 'alpha', task: 'root' });
+    const b = await d.submit({ agent: 'bravo', task: 'hop', parentTaskId: a.id });
+    await expect(
+      d.submit({ agent: 'alpha', task: 'loop', parentTaskId: b.id }),
+    ).rejects.toThrow(/cycle detected/i);
+
+    // Self-delegation (parent agent == target) is the same guard.
+    await expect(
+      d.submit({ agent: 'alpha', task: 'self', parentTaskId: a.id }),
+    ).rejects.toThrow(/cycle detected/i);
+
+    await d.shutdown();
+  });
+
+  test('rejects a delegation past the depth limit', async () => {
+    const run = new FakeRunManager();
+    const d = makeDaemon(run);
+    await d.start();
+
+    // Build a linear chain of 8 distinct agents; the 9th hop exceeds the limit.
+    let parentId: string | undefined;
+    for (let i = 0; i < 8; i++) {
+      const rec = await d.submit({
+        agent: `agent-${i}`,
+        task: `t${i}`,
+        ...(parentId ? { parentTaskId: parentId } : {}),
+      });
+      parentId = rec.id;
+    }
+    await expect(
+      d.submit({ agent: 'agent-8', task: 'too-deep', parentTaskId: parentId }),
+    ).rejects.toThrow(/depth limit/i);
+
+    await d.shutdown();
+  });
+
   test('logs returns empty string for a task with no log yet', async () => {
     const run = new FakeRunManager();
     const d = makeDaemon(run);

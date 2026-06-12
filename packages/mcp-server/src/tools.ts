@@ -182,21 +182,6 @@ async function handleRun(args: Record<string, unknown>, ctx: ToolHandlerCtx): Pr
     );
   }
 
-  // KMAN_RUN_CHAIN is a comma-separated list of agents in the current
-  // delegation stack. Cycles of any depth (a → b → a) get rejected here
-  // before we spawn another backend. Strip an unsubstituted `${...}`
-  // placeholder — that means the host never set the var.
-  const rawChain = process.env['KMAN_RUN_CHAIN'];
-  const chain = rawChain && !rawChain.includes('${') ? rawChain.split(',').filter(Boolean) : [];
-  if (chain.includes(agent)) {
-    return errorResult(
-      `Refusing to delegate to "${agent}" — cycle detected (chain so far: ${chain.join(' → ')}).`,
-    );
-  }
-  if (chain.length >= 8) {
-    return errorResult(`Delegation depth limit reached (chain: ${chain.join(' → ')}).`);
-  }
-
   if (!(await agentExists(agent))) {
     return errorResult(`Agent "${agent}" not found at ~/.kman/agents/${agent}/.`);
   }
@@ -214,7 +199,6 @@ async function handleRun(args: Record<string, unknown>, ctx: ToolHandlerCtx): Pr
           ? { permission: args['permission'] as 'ask' | 'auto' | 'yolo' }
           : {}),
         ...(typeof args['cwd'] === 'string' ? { cwd: args['cwd'] as string } : {}),
-        appendToRunChain: ctx.selfAgent ?? agent,
       },
       ctx.runTimeoutMs,
     );

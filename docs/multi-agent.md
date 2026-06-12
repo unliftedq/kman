@@ -69,15 +69,19 @@ or got auto-injection.
 
 ## Cycle and depth protection
 
-Cycle and depth protection are carried through `KMAN_RUN_CHAIN` — a
-comma-separated list of agents in the current delegation stack. The MCP server
-rejects any dispatch whose target is already in the chain (preventing
-`a → b → a` loops) and refuses to spawn beyond depth `8`.
+The daemon is the single chokepoint every delegation funnels through, so it owns
+cycle and depth protection. Each daemon-launched run is told its own task id via
+`KMAN_TASK_ID`; when that agent's injected MCP server delegates, it records the
+running task as the new task's `parentTaskId`. At submit time the daemon walks
+the `parentTaskId` links to reconstruct the chain of agents and rejects any
+dispatch whose target already appears in it (preventing `a → b → a` loops, which
+also covers self-delegation) or that would exceed depth `8`.
 
-Because `kman_run_agent` now queues the task on the daemon rather than running
-it in the caller's process tree, the chain is forwarded to the daemon on the
-task record (`runChain`) and re-seeded onto the spawned backend's environment,
-so the next hop's MCP server still sees the full delegation history.
+Because the chain is derived from task records the daemon owns rather than a
+caller-supplied token, it can't be spoofed, and the guard applies uniformly to
+MCP dispatch, direct `kman run`, and retries. The injected MCP server also keeps
+a fast local self-dispatch check (via `KMAN_SELF_AGENT`) so an agent calling
+straight back to itself fails immediately instead of round-tripping the daemon.
 
 Each `kman_run_agent` re-shells `kman` rather than running in-process, which
 keeps the MCP server's stdout transport isolated from peer agents' stdio.

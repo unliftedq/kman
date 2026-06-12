@@ -59,9 +59,10 @@ export class CoreRunManager implements RunManager {
           ...(rec.permission ? { permission: rec.permission } : {}),
           ...(rec.outputFormat ? { outputFormat: rec.outputFormat } : {}),
           ...(rec.cwd ? { cwd: rec.cwd } : {}),
-          // Carry the delegation chain across the daemon hop so the injected
-          // MCP server in the spawned backend can detect cross-agent cycles.
-          ...(rec.runChain ? { env: { KMAN_RUN_CHAIN: rec.runChain } } : {}),
+          // Tell the spawned backend its own task id. Its injected MCP server
+          // forwards this as the parentTaskId of any task it delegates, so the
+          // daemon can reconstruct the chain and detect cross-agent cycles.
+          env: { KMAN_TASK_ID: rec.id },
         });
         if (this.prepareContext) ctx = await this.prepareContext(ctx);
       } catch (err) {

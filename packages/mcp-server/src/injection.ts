@@ -34,10 +34,9 @@ export async function ensureInjectionConfig(opts: InjectionConfigOptions): Promi
 
   const args = [...(opts.kmanBaseArgs ?? []), 'mcp', '--self-from-env'];
   // `${VAR}` is the standard substitution syntax both supported backends
-  // honor in `mcpServers.<key>.env`. Server-side `--self-from-env` and the
-  // cycle-chain parser both treat unsubstituted literals (`${...}`) as
-  // unset, so the worst-case behavior on a host that skips substitution is
-  // "no self-exclusion" rather than a crash.
+  // honor in `mcpServers.<key>.env`. Server-side `--self-from-env` treats an
+  // unsubstituted literal (`${...}`) as unset, so the worst-case behavior on a
+  // host that skips substitution is "no self-exclusion" rather than a crash.
   const mcpConfig = {
     mcpServers: {
       kman: {
@@ -45,7 +44,7 @@ export async function ensureInjectionConfig(opts: InjectionConfigOptions): Promi
         args,
         env: {
           KMAN_SELF_AGENT: '${KMAN_SELF_AGENT}',
-          KMAN_RUN_CHAIN: '${KMAN_RUN_CHAIN}',
+          KMAN_TASK_ID: '${KMAN_TASK_ID}',
         },
       },
     },

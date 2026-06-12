@@ -74,7 +74,7 @@ kman mcp install copilot-cli     # writes user-scope ~/.copilot/mcp-config.json
 kman mcp config                  # prints the JSON snippet for any other host
 ```
 
-Cycle protection (`KMAN_RUN_CHAIN`) prevents `a → b → a` loops; depth is capped at 8. See [docs/multi-agent.md](docs/multi-agent.md).
+Cycle protection lives in the daemon: it walks each task's parent links to reject `a → b → a` loops (and self-delegation), capping depth at 8. See [docs/multi-agent.md](docs/multi-agent.md).
 
 ## Layout
 
