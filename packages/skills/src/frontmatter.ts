@@ -21,15 +21,32 @@ export async function readSkillDescription(skillDir: string): Promise<string | u
 
 /** Extract the `description` value from a markdown document's YAML frontmatter. */
 export function extractDescription(raw: string): string | undefined {
-  const normalized = raw.replace(/^\uFEFF/, '');
+  // Normalize line endings so CRLF (common on Windows) parses identically.
+  const normalized = raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   if (!normalized.startsWith('---\n')) return undefined;
   const end = normalized.indexOf('\n---', 4);
   if (end < 0) return undefined;
   const frontmatter = normalized.slice(4, end);
-  const match = /^description:\s*(.*)$/m.exec(frontmatter);
-  if (!match || match[1] === undefined) return undefined;
-  let value = match[1].trim();
-  if (/^[|>](?:[+-]?\d*|\d*[+-]?)$/.test(value)) return undefined;
+  const lines = frontmatter.split('\n');
+  const idx = lines.findIndex((line) => /^description:/.test(line));
+  if (idx < 0) return undefined;
+
+  const inline = /^description:\s*(.*)$/.exec(lines[idx] ?? '')?.[1] ?? '';
+  let value = inline.trim();
+
+  // Block scalar (`|`, `>`, with optional chomping/indent indicators): the
+  // value lives on the following indented lines.
+  if (/^[|>][+-]?\d*$/.test(value)) {
+    const block: string[] = [];
+    for (let i = idx + 1; i < lines.length; i++) {
+      const line = lines[i] ?? '';
+      if (line.trim() !== '' && !/^\s/.test(line)) break; // de-dented: end of block.
+      block.push(line);
+    }
+    value = block.join(' ').replace(/\s+/g, ' ').trim();
+    return value.length > 0 ? value : undefined;
+  }
+
   if (
     (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
     (value.startsWith("'") && value.endsWith("'") && value.length >= 2)

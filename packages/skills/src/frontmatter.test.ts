@@ -29,9 +29,16 @@ describe('extractDescription', () => {
     expect(extractDescription('---\ndescription: \n---\n')).toBeUndefined();
   });
 
-  test('returns undefined for block scalar descriptions', () => {
-    expect(extractDescription('---\ndescription: |\n  multi-line\n---\n')).toBeUndefined();
-    expect(extractDescription('---\ndescription: >-\n  folded\n---\n')).toBeUndefined();
+  test('reads block scalar descriptions', () => {
+    expect(extractDescription('---\ndescription: |\n  multi-line\n  text\n---\n')).toBe('multi-line text');
+    expect(extractDescription('---\ndescription: >-\n  folded\n  value\n---\n')).toBe('folded value');
+  });
+
+  test('tolerates CRLF line endings', () => {
+    expect(extractDescription('---\r\ndescription: Hello world\r\n---\r\n')).toBe('Hello world');
+    expect(extractDescription('---\r\ndescription: |\r\n  multi-line\r\n  text\r\n---\r\n')).toBe(
+      'multi-line text',
+    );
   });
 
   test('tolerates a leading BOM', () => {
