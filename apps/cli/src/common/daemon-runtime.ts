@@ -1,10 +1,11 @@
+import { spawn } from 'node:child_process';
 import {
   CoreRunManager,
   IpcClient,
   type DaemonExec,
   type RunManager,
 } from '@kman/daemon';
-import type { AgentContext } from '@kman/types';
+import { UserError, type AgentContext } from '@kman/types';
 import { resolveBackend } from './backend-registry.js';
 import { attachKmanMcp } from './mcp-inject.js';
 import { mcpServerInvocation } from '../commands/mcp.js';
@@ -40,4 +41,31 @@ export async function getClient(): Promise<IpcClient | undefined> {
   const client = await IpcClient.fromState();
   if (!client) return undefined;
   return (await client.isRunning()) ? client : undefined;
+}
+
+/**
+ * Return a client for the daemon, starting it in the background first if it is
+ * not already running. This is the front door for `kman run` and any other
+ * command that should "just work" without the user manually starting the
+ * daemon. Throws a UserError if the daemon fails to become healthy in time.
+ */
+export async function ensureDaemon(timeoutMs = 5000): Promise<IpcClient> {
+  const existing = await getClient();
+  if (existing) return existing;
+
+  const exec = daemonExec();
+  const child = spawn(exec.command, exec.args, {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  child.unref();
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const client = await getClient();
+    if (client) return client;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  throw new UserError('kman daemon did not become healthy within 5s; check logs.');
 }

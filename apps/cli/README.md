@@ -69,7 +69,8 @@ No plugin files are written into the agent directory. At launch kman materialize
 ### Running
 
 ```bash
-# One-shot, non-interactive.
+# One-shot: submits the task to the daemon (starting it if needed) and prints
+# the task id. The agent runs in the background.
 kman -a coder run --task "Add a regression test for issue #421."
 
 # Override the backend and model for a single call.
@@ -78,13 +79,15 @@ kman -a coder run --runtime copilot-cli --model gpt-5.2 --task "..."
 # Raise permissions (auto = auto-approve tools, yolo = no prompts at all).
 kman -a coder run --permission auto --task "..."
 
-# JSON or streaming output for scripts.
-kman -a coder run --output json   --task "..."
-kman -a coder run --stream        --task "..."
+# Queueing controls.
+kman -a coder run --priority 5 --max-attempts 3 --task "..."
 
-# Pass a backend-native flag straight through.
-kman -a coder run --runtime-flag --debug --task "..."
+# Follow the submitted task.
+kman task get  <id>
+kman task logs <id> -f
 ```
+
+See [Daemon & Task Scheduling](../../docs/daemon.md) for the full task lifecycle.
 
 ### Chat
 

@@ -1,50 +1,12 @@
 import { Command } from 'commander';
 import type { IpcClient, TaskRecord, TaskStatus } from '@kman/daemon';
-import { ExitCode, UserError, type PermissionLevel } from '@kman/types';
-import { requireAgent } from '../common/agent-option.js';
+import { ExitCode, UserError } from '@kman/types';
 import { getClient } from '../common/daemon-runtime.js';
-import { parsePermission } from '../common/run-args.js';
 
 const VALID_STATUSES: TaskStatus[] = ['queued', 'running', 'succeeded', 'failed', 'canceled'];
 
 export function buildTaskCommand(): Command {
-  const cmd = new Command('task').description('Submit and inspect tasks managed by the kman daemon.');
-
-  cmd
-    .command('submit')
-    .description('Queue a task for an agent on the daemon. Use -a <agent> to target.')
-    .requiredOption('--task <text>', 'Task for the agent to perform.')
-    .option('--priority <n>', 'Higher runs first (default 0).', parseIntOpt)
-    .option('--max-attempts <n>', 'Retry up to N times on failure (default 1).', parseIntOpt)
-    .option('--runtime <runtime>', "Override the agent's default runtime.")
-    .option('--model <id>', "Override the agent's default model.")
-    .option('--permission <level>', 'Permission mode (ask | auto | yolo).')
-    .option('--cwd <path>', 'Working directory for the run.')
-    .action(
-      async (opts: {
-        task: string;
-        priority?: number;
-        maxAttempts?: number;
-        runtime?: string;
-        model?: string;
-        permission?: string;
-        cwd?: string;
-      }) => {
-        const agent = requireAgent();
-        const client = await requireClient();
-        const rec = await client.submit({
-          agent,
-          task: opts.task,
-          ...(opts.priority !== undefined ? { priority: opts.priority } : {}),
-          ...(opts.maxAttempts !== undefined ? { maxAttempts: opts.maxAttempts } : {}),
-          ...(opts.runtime ? { runtime: opts.runtime } : {}),
-          ...(opts.model ? { model: opts.model } : {}),
-          ...(opts.permission ? { permission: parsePermission(opts.permission) as PermissionLevel } : {}),
-          ...(opts.cwd ? { cwd: opts.cwd } : {}),
-        });
-        process.stdout.write(`${rec.id}\n`);
-      },
-    );
+  const cmd = new Command('task').description('Inspect and manage tasks scheduled on the kman daemon.');
 
   cmd
     .command('list')
@@ -111,12 +73,6 @@ function validateStatus(s: string): TaskStatus {
     throw new UserError(`Invalid status "${s}". Expected one of: ${VALID_STATUSES.join(', ')}.`);
   }
   return s as TaskStatus;
-}
-
-function parseIntOpt(value: string): number {
-  const n = Number.parseInt(value, 10);
-  if (!Number.isFinite(n)) throw new UserError(`Expected an integer, got "${value}".`);
-  return n;
 }
 
 function formatTaskTable(tasks: TaskRecord[]): string {

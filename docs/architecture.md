@@ -1,27 +1,37 @@
 # Architecture
 
-This page describes how a `kman run` invocation is assembled and executed.
+This page describes how an agent run is assembled and executed.
 
 ## High-level flow
+
+`kman run` submits a task to the resident daemon, which assembles the
+`AgentContext` and spawns the backend (capturing its output to a log).
+`kman chat` runs the same assembly in-process and streams the backend straight
+to your terminal.
 
 ```mermaid
 flowchart LR
     user[User / CLI] -->|kman run --agent coder --task| cli[apps/cli<br/>commander]
-    cli --> core[packages/core<br/>profile + context + launcher]
+    cli -->|submit task over IPC| daemon[kman daemon<br/>queue + scheduler]
+    daemon --> core[packages/core<br/>profile + context + launcher]
     core -->|build| ctx[AgentContext]
     ctx --> prep[Prepare runtime files<br/>for selected agent]
     prep --> backend[Runtime launcher<br/>claude-code / copilot-cli]
-    backend -->|stdout / stderr| user
+    backend -->|stdout / stderr| log[(task log)]
+    user -->|kman task logs / get| log
 ```
 
-kman does **not** interpose on the backend's I/O stream. Backend output (text,
-JSON, or backend-native stream) goes directly to the user's terminal. Session
-state stays inside the backend's own storage.
+For a daemon-launched run, backend output is captured to a per-task log
+(`kman task logs <id>` reads it). For `kman chat`, kman does **not** interpose
+on the backend's I/O stream — backend output goes directly to the user's
+terminal. Session state stays inside the backend's own storage either way.
 
 ## The `AgentContext` pipeline
 
-Every `kman run` builds an immutable `AgentContext` **before** the backend is
-spawned. Downstream launch code reads from this single source of truth.
+Every run builds an immutable `AgentContext` **before** the backend is
+spawned. Downstream launch code reads from this single source of truth. For
+`kman run` this happens inside the daemon's run manager; for `kman chat` it
+happens in the foreground process.
 
 ```mermaid
 flowchart TB

@@ -59,6 +59,9 @@ export class CoreRunManager implements RunManager {
           ...(rec.permission ? { permission: rec.permission } : {}),
           ...(rec.outputFormat ? { outputFormat: rec.outputFormat } : {}),
           ...(rec.cwd ? { cwd: rec.cwd } : {}),
+          // Carry the delegation chain across the daemon hop so the injected
+          // MCP server in the spawned backend can detect cross-agent cycles.
+          ...(rec.runChain ? { env: { KMAN_RUN_CHAIN: rec.runChain } } : {}),
         });
         if (this.prepareContext) ctx = await this.prepareContext(ctx);
       } catch (err) {

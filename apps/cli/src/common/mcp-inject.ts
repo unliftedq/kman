@@ -37,7 +37,10 @@ export async function attachKmanMcp(ctx: AgentContext): Promise<AgentContext> {
     KMAN_SELF_AGENT: ctx.profile.name,
     // Track the delegation chain across nested kman invocations so the MCP
     // server can detect cycles (a → b → a) before spawning the next backend.
-    KMAN_RUN_CHAIN: appendChain(process.env['KMAN_RUN_CHAIN'], ctx.profile.name),
+    // Prefer a chain seeded onto the context (daemon-routed runs carry it on
+    // the task record) and fall back to this process's own env (in-process
+    // `kman chat` runs).
+    KMAN_RUN_CHAIN: appendChain(ctx.env['KMAN_RUN_CHAIN'] ?? process.env['KMAN_RUN_CHAIN'], ctx.profile.name),
     // KMAN_SELECTED_AGENT is how main.ts passes `-a <name>` to subcommands
     // inside *this* kman process. It must NOT leak through the spawned
     // backend to any sub-kman it later spawns — most importantly the

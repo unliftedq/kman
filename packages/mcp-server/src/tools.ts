@@ -1,5 +1,5 @@
 import { agentExists, describeAgent, listAgents } from './agents.js';
-import { runAgent, type RunAgentResult } from './runner.js';
+import { getTask, getTaskLogs, submitAgentTask, type TaskSnapshot } from './runner.js';
 import { ErrorCode, RpcError } from './protocol.js';
 
 export interface ToolDef {
@@ -53,7 +53,9 @@ const KMAN_DESCRIBE_AGENT: ToolDef = {
 const KMAN_RUN_AGENT: ToolDef = {
   name: 'kman_run_agent',
   description:
-    'Run a one-shot task with a kman-managed peer agent and return its stdout. Use after ' +
+    'Submit a one-shot task to a kman-managed peer agent and return a task id immediately ' +
+    '(asynchronous). The agent runs on the kman daemon in the background; poll ' +
+    '`kman_get_task` with the returned id to read its status and final output. Use after ' +
     'choosing an agent from `kman_list_agents`. The task must be self-contained: the peer ' +
     'receives this text, not your conversation or scratch notes, so include relevant context, ' +
     'file paths, constraints, and done criteria. Sessions are not shared; self-delegation ' +
@@ -84,8 +86,28 @@ const KMAN_RUN_AGENT: ToolDef = {
   },
 };
 
+const KMAN_GET_TASK: ToolDef = {
+  name: 'kman_get_task',
+  description:
+    'Check on a task previously started with `kman_run_agent`. Returns the current status ' +
+    '(queued | running | succeeded | failed | canceled) and, once finished, the captured ' +
+    "output. Poll this until the status is terminal before using the agent's result.",
+  inputSchema: {
+    type: 'object',
+    properties: {
+      task_id: { type: 'string', description: 'Task id returned by `kman_run_agent`.' },
+      logs: {
+        type: 'boolean',
+        description: 'Include the captured output. Defaults to true once the task is terminal.',
+      },
+    },
+    required: ['task_id'],
+    additionalProperties: false,
+  },
+};
+
 export function listTools(): ToolDef[] {
-  return [KMAN_LIST_AGENTS, KMAN_DESCRIBE_AGENT, KMAN_RUN_AGENT];
+  return [KMAN_LIST_AGENTS, KMAN_DESCRIBE_AGENT, KMAN_RUN_AGENT, KMAN_GET_TASK];
 }
 
 export async function callTool(
@@ -100,6 +122,8 @@ export async function callTool(
       return handleDescribe(args);
     case KMAN_RUN_AGENT.name:
       return handleRun(args, ctx);
+    case KMAN_GET_TASK.name:
+      return handleGetTask(args, ctx);
     default:
       throw new RpcError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
   }
@@ -177,9 +201,9 @@ async function handleRun(args: Record<string, unknown>, ctx: ToolHandlerCtx): Pr
     return errorResult(`Agent "${agent}" not found at ~/.kman/agents/${agent}/.`);
   }
 
-  let result: RunAgentResult;
+  let result: Awaited<ReturnType<typeof submitAgentTask>>;
   try {
-    result = await runAgent(
+    result = await submitAgentTask(
       ctx.invocation,
       {
         agent,
@@ -200,18 +224,76 @@ async function handleRun(args: Record<string, unknown>, ctx: ToolHandlerCtx): Pr
     );
   }
 
-  const text = result.stdout.trim();
-  if (result.exitCode === 0) {
-    return {
-      content: [{ type: 'text', text: text.length > 0 ? text : '(agent produced no output)' }],
-    };
+  if ('error' in result) {
+    return errorResult(`Agent "${agent}" could not be started: ${result.error}`);
   }
-  return errorResult(
-    `Agent "${agent}" exited with code ${result.exitCode}.\n` +
-      (result.stderr ? `stderr:\n${result.stderr.trim()}\n` : '') +
-      (text ? `stdout:\n${text}` : ''),
-  );
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text:
+          `Task ${result.taskId} submitted to agent "${agent}" and is running in the background.\n` +
+          `Poll \`kman_get_task\` with task_id "${result.taskId}" to check its status and read the result.`,
+      },
+    ],
+  };
 }
+
+async function handleGetTask(args: Record<string, unknown>, ctx: ToolHandlerCtx): Promise<ToolCallResult> {
+  const taskId = stringArg(args, 'task_id');
+  const wantLogs = typeof args['logs'] === 'boolean' ? (args['logs'] as boolean) : undefined;
+
+  let snapshot: Awaited<ReturnType<typeof getTask>>;
+  try {
+    snapshot = await getTask(ctx.invocation, taskId);
+  } catch (err) {
+    return errorResult(
+      `Failed to spawn kman subprocess: ${(err as Error).message}. Check that 'kman' is on PATH or set KMAN_BIN.`,
+    );
+  }
+  if (!('status' in snapshot)) {
+    return errorResult(snapshot.error);
+  }
+
+  const terminal = TERMINAL_STATUSES.has(snapshot.status);
+  const includeLogs = wantLogs ?? terminal;
+
+  let logs = '';
+  if (includeLogs) {
+    const logResult = await getTaskLogs(ctx.invocation, taskId);
+    if ('error' in logResult) {
+      logs = `(could not read logs: ${logResult.error})`;
+    } else {
+      logs = logResult.logs.trim();
+    }
+  }
+
+  const lines: string[] = [
+    `task:    ${snapshot.id}`,
+    `agent:   ${snapshot.agent}`,
+    `status:  ${snapshot.status}`,
+  ];
+  if (snapshot.exitCode !== undefined) lines.push(`exit:    ${snapshot.exitCode}`);
+  if (snapshot.error) lines.push(`error:   ${snapshot.error}`);
+  if (!terminal) {
+    lines.push('', 'Still in progress — poll `kman_get_task` again shortly.');
+  }
+  if (includeLogs) {
+    lines.push('', '--- output ---', logs.length > 0 ? logs : '(no output yet)');
+  }
+
+  return {
+    content: [{ type: 'text', text: lines.join('\n') }],
+    ...(snapshot.status === 'failed' ? { isError: true } : {}),
+  };
+}
+
+const TERMINAL_STATUSES: ReadonlySet<TaskSnapshot['status']> = new Set([
+  'succeeded',
+  'failed',
+  'canceled',
+]);
 
 function stringArg(args: Record<string, unknown>, key: string): string {
   const v = args[key];

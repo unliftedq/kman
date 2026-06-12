@@ -81,16 +81,25 @@ neither option is provided. See [Skills](./skills.md).
 
 ```bash
 kman run --agent coder --task "..." [flags]
+  --priority <n>                     # higher runs first (default 0)
+  --max-attempts <n>                 # retry up to N times on failure (default 1)
   --runtime <backend>                # override profile default for this call
   --model <id>                       # override
   --permission ask|auto|yolo         # abstract permission level
-  --runtime-flag <flag>              # pass a backend-native flag through (repeatable)
-  --output text|json|stream-json     # default text; passed through to backend
-  --stream                           # implies --output stream-json
   --cwd <path>                       # working directory for the backend process
 ```
 
-`--stream` conflicts with `--output` of a different value.
+`kman run` **submits the task to the kman daemon** (starting it in the
+background if it isn't already running) and prints the new task id. The agent
+runs on the daemon, subject to its concurrency limits. Follow the task with:
+
+```bash
+kman task get  <id>        # status + metadata
+kman task logs <id> -f     # stream captured output until it finishes
+```
+
+It is the only way to queue a task; the [`kman task`](./daemon.md) subcommands
+(`list`, `get`, `logs`, `cancel`) inspect and manage tasks once submitted.
 
 ## `kman chat` — interactive session
 
@@ -103,13 +112,16 @@ kman chat --agent coder [flags]
   --cwd <path>
 ```
 
+`kman chat` still launches the backend directly in the foreground (it is
+interactive), so backend-native flags remain available there via `--runtime-flag`.
+
 ## Resuming a previous conversation
 
-Resume uses the backend's native mechanism, exposed via `--runtime-flag`:
+Resume uses the backend's native mechanism, exposed via `--runtime-flag` on
+`kman chat`:
 
 ```bash
 # claude-code:
-kman run  --agent coder --runtime-flag --continue --task "next step"
 kman chat --agent coder --runtime-flag --resume=<id>
 ```
 
@@ -133,7 +145,6 @@ kman mcp config
 
 Auto-injection during `kman run` / `kman chat` is on by default; set
 `KMAN_NO_MCP=1` in the parent shell to disable it. See [Multi-Agent Dispatch](./multi-agent.md).
-
 ## `kman doctor` — diagnostics
 
 ```bash
