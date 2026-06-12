@@ -1,79 +1,69 @@
 import { Command } from 'commander';
-import { buildContext, launchRun, readProfile } from '@kman/core';
-import { UserError, type OutputFormat, type PermissionLevel } from '@kman/types';
+import { UserError, type PermissionLevel } from '@kman/types';
 import { requireAgent } from '../common/agent-option.js';
-import { resolveBackend } from '../common/backend-registry.js';
-import { attachKmanMcp } from '../common/mcp-inject.js';
-import { parseOutputFormat, parsePermission } from '../common/run-args.js';
+import { ensureDaemon } from '../common/daemon-runtime.js';
+import { parsePermission } from '../common/run-args.js';
 
 export function buildRunCommand(): Command {
   return new Command('run')
-    .description('Run an agent on a single task non-interactively.')
+    .description(
+      'Run an agent on a single task. Submits the task to the kman daemon (starting it if ' +
+        'needed) and prints the task id. Use `kman task get <id>` / `kman task logs <id>` to ' +
+        'follow it.',
+    )
     .option('--task <text>', 'Task for the agent to perform.')
+    .option('--priority <n>', 'Higher runs first (default 0).', parseIntOpt)
+    .option('--max-attempts <n>', 'Retry up to N times on failure (default 1).', parseIntOpt)
     .option('--runtime <runtime>', "Override the agent's default runtime for this call.")
     .option('--model <id>', "Override the agent's default model for this call.")
     .option('--permission <level>', 'Permission mode (ask | auto | yolo).')
-    .option(
-      '--runtime-flag <flag>',
-      'Pass a runtime-native flag straight through (repeatable).',
-      collect,
-      [] as string[],
-    )
-    .option('--output <format>', 'Output format (text | json | stream-json).')
-    .option('--stream', 'Stream incremental output; implies --output stream-json.')
     .option('--cwd <path>', 'Working directory for the runtime process.')
     .action(
       async (opts: {
         task?: string;
+        priority?: number;
+        maxAttempts?: number;
         runtime?: string;
         model?: string;
         permission?: string;
-        runtimeFlag: string[];
-        output?: string;
-        stream?: boolean;
         cwd?: string;
       }) => {
         const agent = requireAgent();
-        const profile = await readProfile(agent);
-
-        if (opts.stream && opts.output && opts.output !== 'stream-json') {
-          throw new UserError('--stream conflicts with --output of a different value.');
+        if (!opts.task) {
+          throw new UserError('Missing required --task <text>.');
         }
 
-        const ctx = await buildContext(profile, {
-          ...(opts.runtime ? { backend: opts.runtime } : {}),
+        const client = await ensureDaemon();
+        const runChain = resolveRunChain();
+        const rec = await client.submit({
+          agent,
+          task: opts.task,
+          ...(opts.priority !== undefined ? { priority: opts.priority } : {}),
+          ...(opts.maxAttempts !== undefined ? { maxAttempts: opts.maxAttempts } : {}),
+          ...(opts.runtime ? { runtime: opts.runtime } : {}),
           ...(opts.model ? { model: opts.model } : {}),
           ...(opts.permission ? { permission: parsePermission(opts.permission) as PermissionLevel } : {}),
-          ...(opts.output ? { outputFormat: parseOutputFormat(opts.output) as OutputFormat } : {}),
-          ...(opts.stream !== undefined ? { stream: opts.stream === true } : {}),
           ...(opts.cwd ? { cwd: opts.cwd } : {}),
-          ...(opts.task !== undefined ? { task: opts.task } : {}),
-          runtimeFlags: expandRuntimeFlags(opts.runtimeFlag),
+          ...(runChain ? { runChain } : {}),
         });
-
-        const backend = resolveBackend(ctx.backend);
-        const launchCtx = await attachKmanMcp(ctx);
-        const { exitCode } = await launchRun(backend, launchCtx);
-        process.exit(exitCode);
+        process.stdout.write(`${rec.id}\n`);
       },
     );
 }
 
-function collect(value: string, previous: string[]): string[] {
-  return [...previous, value];
+function parseIntOpt(value: string): number {
+  const n = Number.parseInt(value, 10);
+  if (!Number.isFinite(n)) throw new UserError(`Expected an integer, got "${value}".`);
+  return n;
 }
 
-function expandRuntimeFlags(values: string[]): string[] {
-  const out: string[] = [];
-  for (const item of values) {
-    if (item.includes('=') && !item.startsWith('--')) {
-      const eq = item.indexOf('=');
-      const k = item.slice(0, eq);
-      const v = item.slice(eq + 1);
-      out.push(`--${k}`, v);
-    } else {
-      out.push(item);
-    }
-  }
-  return out;
+/**
+ * The delegation chain that led to this run, carried via KMAN_RUN_CHAIN when an
+ * agent's injected MCP server re-shells `kman run`. Forwarded to the daemon on
+ * the task so the eventual backend's own MCP server can detect cross-agent
+ * cycles. An unsubstituted `${...}` placeholder means the host never set it.
+ */
+function resolveRunChain(): string | undefined {
+  const raw = process.env['KMAN_RUN_CHAIN'];
+  return raw && !raw.includes('${') ? raw : undefined;
 }

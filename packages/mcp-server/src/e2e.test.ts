@@ -12,7 +12,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile, chmod } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile, readFile, chmod } from 'node:fs/promises';
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -120,16 +120,37 @@ describe('end-to-end: kman mcp over real stdio', () => {
       mockKmanScript,
       [
         '#!/usr/bin/env node',
-        '// Mock kman: print the resolved -a / --task pair so tests can assert',
-        '// that the MCP server forwarded arguments correctly.',
+        '// Mock kman. Emulates the async daemon-backed CLI surface the MCP',
+        '// server now re-shells into:',
+        '//   `-a <name> run --task <text>`  -> prints a task id (and records args)',
+        '//   `task get <id> --json`         -> prints a terminal TaskRecord',
+        '//   `task logs <id>`               -> prints the captured output',
+        'import { writeFileSync } from "node:fs";',
+        'import { join } from "node:path";',
+        'const home = process.env.KMAN_HOME;',
         'const args = process.argv.slice(2);',
-        'let agent = null, task = null;',
-        'for (let i = 0; i < args.length; i++) {',
-        '  if (args[i] === "-a" || args[i] === "--agent") agent = args[++i];',
-        '  else if (args[i] === "--task") task = args[++i];',
+        'if (args.includes("run")) {',
+        '  let agent = null, task = null;',
+        '  for (let i = 0; i < args.length; i++) {',
+        '    if (args[i] === "-a" || args[i] === "--agent") agent = args[++i];',
+        '    else if (args[i] === "--task") task = args[++i];',
+        '  }',
+        '  writeFileSync(join(home, "last-run.json"), JSON.stringify({ agent, task }));',
+        '  process.stdout.write("t_mock0001\\n");',
+        '  process.exit(0);',
         '}',
-        'process.stdout.write(`MOCK_KMAN_OK agent=${agent} task=${task}\\n`);',
-        'process.exit(0);',
+        'if (args[0] === "task" && args[1] === "get") {',
+        '  const id = args[2];',
+        '  process.stdout.write(JSON.stringify({ id, agent: "peer", status: "succeeded", exitCode: 0 }) + "\\n");',
+        '  process.exit(0);',
+        '}',
+        'if (args[0] === "task" && args[1] === "logs") {',
+        '  const id = args[2];',
+        '  process.stdout.write(`MOCK_OUTPUT for ${id}\\n`);',
+        '  process.exit(0);',
+        '}',
+        'process.stderr.write(`unexpected argv: ${args.join(" ")}\\n`);',
+        'process.exit(1);',
       ].join('\n'),
       'utf8',
     );
@@ -174,7 +195,7 @@ describe('end-to-end: kman mcp over real stdio', () => {
     client.send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
     const toolsRes = await client.next();
     const toolNames = ((toolsRes.result as { tools: Array<{ name: string }> }).tools).map((t) => t.name);
-    expect(toolNames).toEqual(expect.arrayContaining(['kman_list_agents', 'kman_run_agent']));
+    expect(toolNames).toEqual(expect.arrayContaining(['kman_list_agents', 'kman_run_agent', 'kman_get_task']));
 
     // kman_list_agents — peer should be there, caller should not (self-hidden).
     client.send({
@@ -237,7 +258,7 @@ describe('end-to-end: kman mcp over real stdio', () => {
       if (result?.isError) {
         expect(result.content[0]!.text).toMatch(/spawn|Failed/i);
       } else {
-        expect(result!.content[0]!.text).toContain('MOCK_KMAN_OK agent=peer task=hello peer');
+        expect(result!.content[0]!.text).toContain('t_mock0001');
       }
       await client.close();
       return;
@@ -261,7 +282,28 @@ describe('end-to-end: kman mcp over real stdio', () => {
     const runRes = await client.next();
     const result = runRes.result as { content: Array<{ text: string }>; isError?: boolean };
     expect(result.isError).toBeFalsy();
-    expect(result.content[0]!.text).toContain('MOCK_KMAN_OK agent=peer task=hello peer');
+    // Async submit returns the task id printed by `kman run`.
+    expect(result.content[0]!.text).toContain('t_mock0001');
+
+    // The run subprocess recorded the forwarded -a / --task args.
+    const lastRun = JSON.parse(await readFile(join(tmpHome, 'last-run.json'), 'utf8')) as {
+      agent: string;
+      task: string;
+    };
+    expect(lastRun).toEqual({ agent: 'peer', task: 'hello peer' });
+
+    // kman_get_task polls status + output via `kman task get` / `kman task logs`.
+    client.send({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/call',
+      params: { name: 'kman_get_task', arguments: { task_id: 't_mock0001' } },
+    });
+    const getRes = await client.next();
+    const getResult = getRes.result as { content: Array<{ text: string }>; isError?: boolean };
+    expect(getResult.isError).toBeFalsy();
+    expect(getResult.content[0]!.text).toContain('status:  succeeded');
+    expect(getResult.content[0]!.text).toContain('MOCK_OUTPUT for t_mock0001');
 
     await client.close();
   }, 15_000);

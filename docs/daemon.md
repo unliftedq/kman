@@ -1,9 +1,12 @@
 # Daemon & Task Scheduling
 
 kman can run as a **resident daemon** that manages a queue of agent tasks in the
-background and schedules them with a concurrency limit. Instead of one blocking
-`kman run` per task, you submit tasks to the daemon and it runs them on your
-behalf, capturing each run's output to a log.
+background and schedules them with a concurrency limit. You submit tasks to the
+daemon and it runs them on your behalf, capturing each run's output to a log.
+
+`kman run` is the front door for queueing a task: it auto-starts the daemon if
+needed, submits the task, and prints its id. The `kman task` subcommands then
+inspect and manage those tasks.
 
 The daemon's lifecycle is owned by an OS-native **host**:
 
@@ -19,7 +22,7 @@ The daemon's lifecycle is owned by an OS-native **host**:
 kman daemon start            # launch in the background
 kman daemon status           # is it running? how many tasks queued/running?
 
-kman -a coder task submit --task "Refactor the auth module."
+kman -a coder run --task "Refactor the auth module."   # auto-starts daemon, prints task id
 kman task list               # see all tasks and their status
 kman task logs <id> -f       # follow a task's output
 kman task get <id>           # full record (status, attempts, error, timings)
@@ -37,13 +40,13 @@ kman daemon uninstall        # remove autostart
 
 ## How it works
 
-The daemon reuses the exact same run pipeline as `kman run`
+The daemon reuses the exact same run pipeline as an interactive launch
 (`buildContext` → backend `spawn` → soul injection → kman MCP), so a
-daemon-launched run is identical to an interactive one — it just runs detached
-with its output captured.
+daemon-launched run is identical — it just runs detached with its output
+captured.
 
 ```
-kman task submit ──IPC──▶ ┌──────────── kman daemon ─────────────┐
+kman run ───────────IPC▶  ┌──────────── kman daemon ─────────────┐
 kman daemon status        │  IPC server (control plane)          │
                           │     │                                │
                           │  TaskStore ◀─▶ Scheduler (concurrency)│

@@ -28,6 +28,12 @@ export interface TaskRecord {
   permission?: PermissionLevel;
   outputFormat?: OutputFormat;
   cwd?: string;
+  /**
+   * Delegation chain (comma-separated agent names) that led to this task.
+   * Carried across the daemon hop so the spawned backend's injected MCP
+   * server can still detect cross-agent cycles (a → b → a).
+   */
+  runChain?: string;
   /** Relative path (under daemon home) to the captured log. */
   logFile: string;
 }
@@ -43,6 +49,8 @@ export interface SubmitTaskRequest {
   permission?: PermissionLevel;
   outputFormat?: OutputFormat;
   cwd?: string;
+  /** Delegation chain (comma-separated agent names) seeding cycle detection. */
+  runChain?: string;
 }
 
 /** Snapshot returned by GET /status. */

@@ -28,12 +28,15 @@ doc rewrites, niche-domain analysis), consider delegating:
 
   1. Call \`kman_list_agents\` to see the current local roster.
   2. If needed, call \`kman_describe_agent\` to confirm fit from the agent's profile and soul prompt.
-  3. Call \`kman_run_agent\` with the agent name and a self-contained task. The response is the agent's \
-    stdout; incorporate it into your own answer and cite the agent by name.
+  3. Call \`kman_run_agent\` with the agent name and a self-contained task. It submits the task to the \
+    kman daemon and returns a task id immediately — the peer runs in the background.
+  4. Poll \`kman_get_task\` with that id until the status is terminal (succeeded | failed | canceled), \
+    then read the captured output and incorporate it into your own answer, citing the agent by name.
 
 If no agent fits, do the work yourself. Each \`kman_run_agent\` call is a fresh one-shot run; sessions \
 are not shared and the peer cannot see your conversation or scratch notes. Self-delegation and cycles \
-are blocked server-side.
+are blocked server-side. Because runs are asynchronous you can start several agents and poll them as \
+their results come in.
 
 For reusable workflows, four prompts are available for hosts to surface as slash commands: \
 \`list-agents\` (show the roster), \`find-agent\` (choose a specialist), \`delegate-task\` (hand \

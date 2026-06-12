@@ -128,6 +128,7 @@ describe('MCP server', () => {
     expect(names).toContain('kman_list_agents');
     expect(names).toContain('kman_describe_agent');
     expect(names).toContain('kman_run_agent');
+    expect(names).toContain('kman_get_task');
   });
 
   it('lists resources and resource templates', async () => {
