@@ -1,3 +1,4 @@
+import { request as httpRequest, type RequestOptions } from 'node:http';
 import {
   ROUTES,
   TOKEN_HEADER,
@@ -125,29 +126,55 @@ export class IpcClient {
     const headers = new Headers(init.headers);
     if (auth && this.token) headers.set(TOKEN_HEADER, this.token);
 
-    const { url, unix } =
-      this.endpoint.kind === 'unix'
-        ? { url: `http://localhost${path}`, unix: this.endpoint.path }
-        : { url: `http://${this.endpoint.host}:${this.endpoint.port}${path}`, unix: undefined };
+    const method = (init.method ?? 'GET').toUpperCase();
+    const body = typeof init.body === 'string' ? init.body : undefined;
 
-    try {
-      return await fetch(url, {
-        ...init,
-        headers,
-        ...(unix ? { unix } : {}),
-      } as RequestInit & { unix?: string });
-    } catch (err) {
-      const code = (err as { code?: string }).code;
-      // Bun surfaces these when nothing is listening on the socket/port.
-      const unreachable = new Set([
-        'ENOENT',
-        'ECONNREFUSED',
-        'ConnectionRefused',
-        'FailedToOpenSocket',
-        'ECONNRESET',
-      ]);
-      if (code && unreachable.has(code)) throw new DaemonUnavailableError();
-      throw err;
-    }
+    const headerObj: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      headerObj[key] = value;
+    });
+    if (body !== undefined) headerObj['content-length'] = String(Buffer.byteLength(body));
+
+    const options: RequestOptions =
+      this.endpoint.kind === 'unix'
+        ? { socketPath: this.endpoint.path, path, method, headers: headerObj }
+        : { host: this.endpoint.host, port: this.endpoint.port, path, method, headers: headerObj };
+
+    return new Promise<Response>((resolve, reject) => {
+      const req = httpRequest(options, (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          const resHeaders = new Headers();
+          for (const [key, value] of Object.entries(res.headers)) {
+            if (value === undefined) continue;
+            if (Array.isArray(value)) for (const v of value) resHeaders.append(key, v);
+            else resHeaders.set(key, value);
+          }
+          resolve(
+            new Response(Buffer.concat(chunks), {
+              status: res.statusCode ?? 502,
+              headers: resHeaders,
+            }),
+          );
+        });
+        res.on('error', reject);
+      });
+      req.on('error', (err: NodeJS.ErrnoException) => {
+        const code = err.code;
+        // Surfaced when nothing is listening on the socket/port.
+        const unreachable = new Set([
+          'ENOENT',
+          'ECONNREFUSED',
+          'ConnectionRefused',
+          'FailedToOpenSocket',
+          'ECONNRESET',
+        ]);
+        if (code && unreachable.has(code)) reject(new DaemonUnavailableError());
+        else reject(err);
+      });
+      if (body !== undefined) req.write(body);
+      req.end();
+    });
   }
 }

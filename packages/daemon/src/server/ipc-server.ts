@@ -1,4 +1,6 @@
 import { rm } from 'node:fs/promises';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import {
   ROUTES,
   TOKEN_HEADER,
@@ -28,12 +30,13 @@ const VALID_STATUSES: ReadonlySet<string> = new Set<TaskStatus>([
  * Local control plane: HTTP/JSON over a Unix-domain socket (named pipe on
  * Windows). Stale socket files are removed before binding so a crashed daemon
  * doesn't block restart. Auth is a single shared token in a header, checked on
- * every route except /health.
+ * every route except /health. Built on `node:http` so the daemon runs under
+ * both Node and Bun.
  */
 export class IpcServer {
   private readonly api: DaemonApi;
   private endpoint: IpcEndpoint;
-  private server?: ReturnType<typeof Bun.serve>;
+  private server?: Server;
 
   constructor(opts: IpcServerOptions) {
     this.api = opts.api;
@@ -46,30 +49,47 @@ export class IpcServer {
   }
 
   async start(): Promise<void> {
+    const server = createServer((nodeReq, nodeRes) => {
+      void this.handleNode(nodeReq, nodeRes);
+    });
     if (this.endpoint.kind === 'unix') {
       // A leftover socket file from an unclean exit refuses bind.
       await rm(this.endpoint.path, { force: true });
-      this.server = Bun.serve({ unix: this.endpoint.path, fetch: (req) => this.handle(req) });
+      await listen(server, { path: this.endpoint.path });
     } else {
-      this.server = Bun.serve({
-        hostname: this.endpoint.host,
-        port: this.endpoint.port,
-        fetch: (req) => this.handle(req),
-      });
+      await listen(server, { host: this.endpoint.host, port: this.endpoint.port });
       // Capture the OS-assigned port when binding to 0.
-      this.endpoint = {
-        kind: 'tcp',
-        host: this.endpoint.host,
-        port: this.server.port ?? this.endpoint.port,
-      };
+      const addr = server.address() as AddressInfo;
+      this.endpoint = { kind: 'tcp', host: this.endpoint.host, port: addr.port };
     }
+    this.server = server;
   }
 
   async stop(): Promise<void> {
-    this.server?.stop(true);
+    const server = this.server;
     this.server = undefined;
+    if (server) {
+      // Force-close keep-alive connections so close() resolves promptly.
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
     if (this.endpoint.kind === 'unix') {
       await rm(this.endpoint.path, { force: true });
+    }
+  }
+
+  private async handleNode(nodeReq: IncomingMessage, nodeRes: ServerResponse): Promise<void> {
+    try {
+      const req = await toWebRequest(nodeReq);
+      const res = await this.handle(req);
+      await writeNodeResponse(nodeRes, res);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!nodeRes.headersSent) {
+        nodeRes.statusCode = 500;
+        nodeRes.setHeader('content-type', 'application/json');
+      }
+      nodeRes.end(JSON.stringify({ error: message }));
     }
   }
 
@@ -151,4 +171,56 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { 'content-type': 'application/json' },
   });
+}
+
+/** Bind a node:http server, resolving once it's listening or rejecting on error. */
+function listen(
+  server: Server,
+  opts: { path: string } | { host: string; port: number },
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onError = (err: Error) => reject(err);
+    server.once('error', onError);
+    const done = () => {
+      server.removeListener('error', onError);
+      resolve();
+    };
+    if ('path' in opts) server.listen(opts.path, done);
+    else server.listen(opts.port, opts.host, done);
+  });
+}
+
+/** Adapt a node:http request into a Web `Request` so the route logic stays runtime-agnostic. */
+async function toWebRequest(nodeReq: IncomingMessage): Promise<Request> {
+  const method = nodeReq.method ?? 'GET';
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(nodeReq.headers)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) for (const v of value) headers.append(key, v);
+    else headers.set(key, value);
+  }
+  const url = `http://localhost${nodeReq.url ?? '/'}`;
+  const init: RequestInit = { method, headers };
+  if (method !== 'GET' && method !== 'HEAD') {
+    init.body = await readBody(nodeReq);
+  }
+  return new Request(url, init);
+}
+
+/** Collect a node request body into a string. */
+function readBody(nodeReq: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    nodeReq.on('data', (chunk: Buffer) => chunks.push(chunk));
+    nodeReq.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    nodeReq.on('error', reject);
+  });
+}
+
+/** Write a Web `Response` out through a node:http response. */
+async function writeNodeResponse(nodeRes: ServerResponse, res: Response): Promise<void> {
+  nodeRes.statusCode = res.status;
+  res.headers.forEach((value, key) => nodeRes.setHeader(key, value));
+  const body = Buffer.from(await res.arrayBuffer());
+  nodeRes.end(body);
 }
