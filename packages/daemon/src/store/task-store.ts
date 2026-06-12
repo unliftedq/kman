@@ -75,7 +75,7 @@ export class TaskStore {
       ...(input.permission !== undefined ? { permission: input.permission } : {}),
       ...(input.outputFormat !== undefined ? { outputFormat: input.outputFormat } : {}),
       ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
-      ...(input.runChain !== undefined ? { runChain: input.runChain } : {}),
+      ...(input.parentTaskId !== undefined ? { parentTaskId: input.parentTaskId } : {}),
     };
     this.index.set(id, rec);
     await this.persist(rec);

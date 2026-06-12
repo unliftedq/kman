@@ -31,7 +31,7 @@ describe('ensureInjectionConfig', () => {
     // performs ${VAR} substitution against its own env when handing this
     // to the MCP subprocess.
     expect(mcp.mcpServers.kman.env.KMAN_SELF_AGENT).toBe('${KMAN_SELF_AGENT}');
-    expect(mcp.mcpServers.kman.env.KMAN_RUN_CHAIN).toBe('${KMAN_RUN_CHAIN}');
+    expect(mcp.mcpServers.kman.env.KMAN_TASK_ID).toBe('${KMAN_TASK_ID}');
   });
 
   it('passes through extra base args (dev-mode bun + script path)', async () => {

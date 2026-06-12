@@ -28,7 +28,7 @@ export function kmanServerEntry(inv: KmanInvocation, extras: { copilotType?: boo
     args: [...inv.baseArgs, 'mcp'],
     env: {
       KMAN_SELF_AGENT: '${KMAN_SELF_AGENT}',
-      KMAN_RUN_CHAIN: '${KMAN_RUN_CHAIN}',
+      KMAN_TASK_ID: '${KMAN_TASK_ID}',
     },
   };
   if (extras.copilotType) entry['type'] = 'local';

@@ -81,7 +81,7 @@ kman mcp install copilot-cli
 kman mcp config
 ```
 
-为避免循环调用，`KMAN_RUN_CHAIN` 会阻止 `a → b → a` 这类链路；默认最大深度为 8。更多细节见 [docs/multi-agent.md](docs/multi-agent.md)。
+循环保护由守护进程负责：它会沿任务的父链回溯，阻止 `a → b → a` 这类链路（以及自我委派），并将最大深度限制为 8。更多细节见 [docs/multi-agent.md](docs/multi-agent.md)。
 
 ## 项目结构
 

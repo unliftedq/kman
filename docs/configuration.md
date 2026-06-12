@@ -60,10 +60,10 @@ kman config unset defaults.model           # revert to built-in default
 | `KMAN_NO_MCP` | When set to `1`, disable kman MCP auto-injection for the process. |
 | `KMAN_BIN` | Executable used for re-shelling inside spawned backends (MCP dispatch). |
 | `KMAN_SELF_AGENT` | Set automatically at spawn time so the MCP server can hide the calling agent and refuse self-dispatch. |
-| `KMAN_RUN_CHAIN` | Comma-separated delegation stack used for cycle/depth protection. |
+| `KMAN_TASK_ID` | Set automatically on a daemon-launched run so delegated tasks record their parent; the daemon walks these links for cycle/depth protection. |
 | `KMAN_DEBUG` | When set, print stack traces on unexpected errors. |
 
-Most `KMAN_SELF_AGENT` / `KMAN_RUN_CHAIN` values are managed by kman itself; you
+Most `KMAN_SELF_AGENT` / `KMAN_TASK_ID` values are managed by kman itself; you
 normally set only `KMAN_HOME`, the `*_BIN` overrides, `KMAN_NO_MCP`, and
 `KMAN_DEBUG`.
 

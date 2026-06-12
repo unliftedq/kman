@@ -7,11 +7,6 @@ export interface SubmitAgentParams {
   model?: string;
   permission?: 'ask' | 'auto' | 'yolo';
   cwd?: string;
-  /**
-   * If set, propagate `KMAN_RUN_CHAIN` so the daemon-launched backend's own
-   * MCP server can detect delegation cycles in the launching agent's chain.
-   */
-  appendToRunChain?: string;
 }
 
 export interface KmanExecResult {
@@ -44,18 +39,11 @@ export interface TaskSnapshot {
 function runKman(
   invocation: { command: string; baseArgs: readonly string[] },
   args: string[],
-  opts: { appendToRunChain?: string; timeoutMs?: number } = {},
+  opts: { timeoutMs?: number } = {},
 ): Promise<KmanExecResult> {
-  const env: NodeJS.ProcessEnv = { ...process.env };
-  if (opts.appendToRunChain) {
-    const prior = env['KMAN_RUN_CHAIN'] ?? '';
-    env['KMAN_RUN_CHAIN'] = prior ? `${prior},${opts.appendToRunChain}` : opts.appendToRunChain;
-  }
-
   return new Promise<KmanExecResult>((resolve, reject) => {
     const child = spawn(invocation.command, [...invocation.baseArgs, ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env,
       shell: false,
     });
 
@@ -101,7 +89,6 @@ export async function submitAgentTask(
   if (params.cwd) args.push('--cwd', params.cwd);
 
   const result = await runKman(invocation, args, {
-    ...(params.appendToRunChain ? { appendToRunChain: params.appendToRunChain } : {}),
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),
   });
 

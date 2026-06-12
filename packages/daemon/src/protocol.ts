@@ -29,11 +29,12 @@ export interface TaskRecord {
   outputFormat?: OutputFormat;
   cwd?: string;
   /**
-   * Delegation chain (comma-separated agent names) that led to this task.
-   * Carried across the daemon hop so the spawned backend's injected MCP
-   * server can still detect cross-agent cycles (a → b → a).
+   * Task that delegated this one (the agent whose run called `kman_run_agent`).
+   * The daemon walks these links to reconstruct the delegation chain and reject
+   * cross-agent cycles (a → b → a) and runaway depth — it is the single
+   * chokepoint every delegation funnels through, so it owns that policy.
    */
-  runChain?: string;
+  parentTaskId?: string;
   /** Relative path (under daemon home) to the captured log. */
   logFile: string;
 }
@@ -49,8 +50,8 @@ export interface SubmitTaskRequest {
   permission?: PermissionLevel;
   outputFormat?: OutputFormat;
   cwd?: string;
-  /** Delegation chain (comma-separated agent names) seeding cycle detection. */
-  runChain?: string;
+  /** Task that delegated this one; seeds the daemon's cycle/depth detection. */
+  parentTaskId?: string;
 }
 
 /** Snapshot returned by GET /status. */
@@ -113,4 +114,11 @@ export const ROUTES = {
 export const TOKEN_HEADER = 'x-kman-token';
 
 /** Default global concurrency when config does not override it. */
-export const DEFAULT_MAX_CONCURRENT = 2;
+export const DEFAULT_MAX_CONCURRENT = 8;
+
+/**
+ * Maximum delegation depth: how many agents may chain via `kman_run_agent`
+ * before the daemon refuses to spawn another. Bounds runaway fan-out even when
+ * no agent repeats.
+ */
+export const MAX_DELEGATION_DEPTH = 8;

@@ -34,7 +34,7 @@ export function buildRunCommand(): Command {
         }
 
         const client = await ensureDaemon();
-        const runChain = resolveRunChain();
+        const parentTaskId = resolveParentTaskId();
         const rec = await client.submit({
           agent,
           task: opts.task,
@@ -44,7 +44,7 @@ export function buildRunCommand(): Command {
           ...(opts.model ? { model: opts.model } : {}),
           ...(opts.permission ? { permission: parsePermission(opts.permission) as PermissionLevel } : {}),
           ...(opts.cwd ? { cwd: opts.cwd } : {}),
-          ...(runChain ? { runChain } : {}),
+          ...(parentTaskId ? { parentTaskId } : {}),
         });
         process.stdout.write(`${rec.id}\n`);
       },
@@ -58,12 +58,13 @@ function parseIntOpt(value: string): number {
 }
 
 /**
- * The delegation chain that led to this run, carried via KMAN_RUN_CHAIN when an
- * agent's injected MCP server re-shells `kman run`. Forwarded to the daemon on
- * the task so the eventual backend's own MCP server can detect cross-agent
- * cycles. An unsubstituted `${...}` placeholder means the host never set it.
+ * The id of the task whose agent run is delegating this one, carried via
+ * KMAN_TASK_ID when that agent's injected MCP server re-shells `kman run`.
+ * Forwarded to the daemon as `parentTaskId` so it can walk the parent links
+ * and reject cross-agent cycles. An unsubstituted `${...}` placeholder means
+ * the host never set it (e.g. a top-level `kman run` with no parent).
  */
-function resolveRunChain(): string | undefined {
-  const raw = process.env['KMAN_RUN_CHAIN'];
+function resolveParentTaskId(): string | undefined {
+  const raw = process.env['KMAN_TASK_ID'];
   return raw && !raw.includes('${') ? raw : undefined;
 }

@@ -9,7 +9,7 @@ import type {
   SubmitTaskRequest,
   TaskRecord,
 } from './protocol.js';
-import { DEFAULT_MAX_CONCURRENT } from './protocol.js';
+import { DEFAULT_MAX_CONCURRENT, MAX_DELEGATION_DEPTH } from './protocol.js';
 import { daemonHome, pidPath } from './paths.js';
 import { Scheduler } from './scheduler/scheduler.js';
 import { TaskStore } from './store/task-store.js';
@@ -120,9 +120,43 @@ export class Daemon implements DaemonApi {
     if (!req.agent || !req.task) {
       throw new Error('agent and task are required');
     }
+    this.assertDelegable(req.agent, req.parentTaskId);
     const rec = await this.store.create(req);
     await this.scheduler.kick();
     return rec;
+  }
+
+  /**
+   * Reconstruct the delegation chain by walking `parentTaskId` links and reject
+   * submissions that would loop (a → b → a, which also covers self-delegation)
+   * or exceed the depth limit. Because every delegation — MCP, direct `kman
+   * run`, or retry — funnels through this one submit path, this is the single
+   * authoritative cycle/depth guard; the chain is derived from records the
+   * daemon owns rather than a caller-supplied token, so it can't be spoofed.
+   */
+  private assertDelegable(agent: string, parentTaskId?: string): void {
+    const ancestors: string[] = [];
+    const seen = new Set<string>();
+    let cursor = parentTaskId;
+    while (cursor && !seen.has(cursor)) {
+      seen.add(cursor);
+      const parent = this.store.get(cursor);
+      if (!parent) break;
+      ancestors.push(parent.agent);
+      cursor = parent.parentTaskId;
+    }
+    // ancestors is nearest-first; reverse for a root → … → parent trail.
+    const trail = [...ancestors].reverse();
+    if (ancestors.includes(agent)) {
+      throw new Error(
+        `Refusing to delegate to "${agent}" — cycle detected (chain: ${[...trail, agent].join(' → ')}).`,
+      );
+    }
+    if (ancestors.length >= MAX_DELEGATION_DEPTH) {
+      throw new Error(
+        `Delegation depth limit (${MAX_DELEGATION_DEPTH}) reached (chain: ${trail.join(' → ')}).`,
+      );
+    }
   }
 
   list(query: ListTasksQuery): TaskRecord[] {

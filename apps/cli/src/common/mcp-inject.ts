@@ -12,6 +12,9 @@ import { isKmanInstalledIn, mcpServerInvocation } from '../commands/mcp.js';
  * `KMAN_SELF_AGENT` carries the calling agent's name through so the server
  * hides it from its own roster and refuses to dispatch back to it; the
  * placeholder is substituted at spawn time against the env we set here.
+ * `KMAN_TASK_ID` (set on the context by the daemon for daemon-routed runs)
+ * rides along untouched so the server can tag delegated tasks with their
+ * parent for the daemon's cycle detection.
  *
  * Opt-out: setting KMAN_NO_MCP=1 returns the context unchanged so users on
  * locked-down systems or running tests aren't forced through the extra
@@ -35,12 +38,6 @@ export async function attachKmanMcp(ctx: AgentContext): Promise<AgentContext> {
   const env: Record<string, string> = {
     ...ctx.env,
     KMAN_SELF_AGENT: ctx.profile.name,
-    // Track the delegation chain across nested kman invocations so the MCP
-    // server can detect cycles (a → b → a) before spawning the next backend.
-    // Prefer a chain seeded onto the context (daemon-routed runs carry it on
-    // the task record) and fall back to this process's own env (in-process
-    // `kman chat` runs).
-    KMAN_RUN_CHAIN: appendChain(ctx.env['KMAN_RUN_CHAIN'] ?? process.env['KMAN_RUN_CHAIN'], ctx.profile.name),
     // KMAN_SELECTED_AGENT is how main.ts passes `-a <name>` to subcommands
     // inside *this* kman process. It must NOT leak through the spawned
     // backend to any sub-kman it later spawns — most importantly the
@@ -93,11 +90,4 @@ function mcpConfigFlagFor(backend: BackendName): McpConfigFlagSpec | undefined {
     default:
       return undefined;
   }
-}
-
-function appendChain(prior: string | undefined, name: string): string {
-  if (!prior) return name;
-  const parts = prior.split(',').filter(Boolean);
-  if (parts[parts.length - 1] === name) return prior;
-  return [...parts, name].join(',');
 }

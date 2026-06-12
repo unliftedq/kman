@@ -11,7 +11,6 @@ describe('attachKmanMcp', () => {
   let savedHome: string | undefined;
   let savedUserprofile: string | undefined;
   let savedSelected: string | undefined;
-  let savedChain: string | undefined;
   let savedNoMcp: string | undefined;
 
   beforeEach(async () => {
@@ -20,7 +19,6 @@ describe('attachKmanMcp', () => {
     savedHome = process.env['HOME'];
     savedUserprofile = process.env['USERPROFILE'];
     savedSelected = process.env['KMAN_SELECTED_AGENT'];
-    savedChain = process.env['KMAN_RUN_CHAIN'];
     savedNoMcp = process.env['KMAN_NO_MCP'];
     process.env['KMAN_HOME'] = tmpHome;
     // Redirect homedir() so isKmanInstalledIn() reads our scratch config,
@@ -35,7 +33,6 @@ describe('attachKmanMcp', () => {
     restore('HOME', savedHome);
     restore('USERPROFILE', savedUserprofile);
     restore('KMAN_SELECTED_AGENT', savedSelected);
-    restore('KMAN_RUN_CHAIN', savedChain);
     restore('KMAN_NO_MCP', savedNoMcp);
     await rm(tmpHome, { recursive: true, force: true });
   });
@@ -98,19 +95,17 @@ describe('attachKmanMcp', () => {
 
     expect(augmented.extraArgs).toEqual(['--user-flag']);
     expect(augmented.env.KMAN_SELF_AGENT).toBe('coder');
-    expect(augmented.env.KMAN_RUN_CHAIN).toBe('coder');
     expect(augmented.env.KMAN_SELECTED_AGENT).toBe('');
   });
 
-  it('initializes KMAN_RUN_CHAIN with the agent name when no chain is set', async () => {
-    const augmented = await attachKmanMcp(makeCtx('coder'));
-    expect(augmented.env.KMAN_RUN_CHAIN).toBe('coder');
-  });
-
-  it('appends to KMAN_RUN_CHAIN when one already exists', async () => {
-    process.env['KMAN_RUN_CHAIN'] = 'planner';
-    const augmented = await attachKmanMcp(makeCtx('coder'));
-    expect(augmented.env.KMAN_RUN_CHAIN).toBe('planner,coder');
+  it('passes the daemon-set KMAN_TASK_ID through untouched for cycle detection', async () => {
+    // The daemon stamps KMAN_TASK_ID onto the context so the injected MCP
+    // server can tag delegated tasks with their parent. attachKmanMcp must
+    // preserve it rather than overwrite the env.
+    const ctx = makeCtx('coder');
+    ctx.env = { KMAN_TASK_ID: 't_abc123' };
+    const augmented = await attachKmanMcp(ctx);
+    expect(augmented.env.KMAN_TASK_ID).toBe('t_abc123');
   });
 
   it('is a no-op when KMAN_NO_MCP=1', async () => {
