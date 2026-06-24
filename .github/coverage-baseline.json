@@ -1,0 +1,5 @@
+{
+  "comment": "Coverage floor enforced by scripts/check-coverage.mjs. Values are weighted percentages computed from coverage/lcov.info (lines = sum(LH)/sum(LF), functions = sum(FNH)/sum(FNF)). CI fails if measured coverage drops below these numbers. When you intentionally add well-tested code that raises coverage, bump these values so the floor ratchets up and cannot silently regress later.",
+  "lines": 64.05,
+  "functions": 77.57
+}

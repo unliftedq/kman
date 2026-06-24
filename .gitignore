@@ -17,3 +17,6 @@ bun.lockb
 .env
 .env.*
 !.env.example
+
+# Coverage output
+coverage/

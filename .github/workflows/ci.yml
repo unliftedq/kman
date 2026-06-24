@@ -1,0 +1,54 @@
+name: ci
+
+# Runs the unit-test suite on every pull request (and on pushes to main),
+# reports test results plus a coverage summary, and fails the build if any
+# test fails or if overall coverage drops below the committed baseline
+# (.github/coverage-baseline.json, enforced by scripts/check-coverage.mjs).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel superseded runs for the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit tests & coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build packages
+        run: bun run build
+
+      - name: Run unit tests with coverage
+        run: bun test --coverage
+
+      - name: Enforce coverage does not decrease
+        run: node scripts/check-coverage.mjs
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: warn
