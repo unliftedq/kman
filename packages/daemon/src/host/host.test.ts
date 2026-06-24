@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import type { DaemonExec } from './host.js';
 import { systemdUnitText, SystemdHost } from './systemd.js';
 import { launchdPlistText, LaunchdHost, LAUNCHD_LABEL } from './launchd.js';

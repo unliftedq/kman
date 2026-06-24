@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import type { AgentContext } from '@kman/types';
 import { renderSoul } from './index.js';
 

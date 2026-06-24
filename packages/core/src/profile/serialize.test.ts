@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import TOML from '@iarna/toml';
 import { parseProfileToml } from './read.js';
 import { defaultProfile } from './schema.js';

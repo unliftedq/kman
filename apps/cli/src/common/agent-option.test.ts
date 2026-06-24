@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import { UserError } from '@kman/types';
 import { extractAgentOption } from './agent-option.js';
 

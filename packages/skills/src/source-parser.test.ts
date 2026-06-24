@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import { isAbsolute, resolve } from 'node:path';
 import { UserError } from '@kman/types';
 import { parseSource, sanitizeSubpath } from './source-parser.js';

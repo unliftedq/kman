@@ -10,7 +10,7 @@
  * the tool handler, the subprocess spawn, and the stdout→tools/call result
  * round-trip.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile, readFile, chmod } from 'node:fs/promises';
 import { tmpdir, homedir } from 'node:os';
