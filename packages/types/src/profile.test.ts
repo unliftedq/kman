@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import { AGENT_NAME_PATTERN } from './profile.js';
 
 describe('AGENT_NAME_PATTERN', () => {

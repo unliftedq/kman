@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { join } from 'node:path';
 import { KMAN_PLUGIN_NAME, runtimeAgentRoot, runtimePluginDir, runtimeRoot } from './paths.js';
 

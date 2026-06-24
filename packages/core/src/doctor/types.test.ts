@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import { highestSeverity, type Report } from './types.js';
 
 function report(...severities: Array<'ok' | 'info' | 'warn' | 'error'>): Report {

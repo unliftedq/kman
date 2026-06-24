@@ -1,5 +1,0 @@
-[test]
-# Emit a human-readable table and an lcov report for CI coverage tooling.
-# The lcov report is consumed by scripts/check-coverage.mjs to enforce that
-# overall coverage does not decrease (see .github/workflows/ci.yml).
-coverageReporter = ["text", "lcov"]

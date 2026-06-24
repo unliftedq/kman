@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import type { AgentContext, PermissionLevel } from '@kman/types';
 import { CopilotCliBackend, createCopilotCliBackend } from './backend.js';
 
