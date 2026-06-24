@@ -6,7 +6,7 @@ import {
   parseSource,
   removeSkill,
   truncate,
-  updateSkill,
+  updateSkills,
   vendorSkill,
   type DiscoveredSkill,
 } from '@kman/skills';
@@ -106,9 +106,9 @@ export function buildSkillsCommand(): Command {
       const targets = opts.all
         ? (await listInstalledSkills(agent)).filter((s) => !!s.manifest).map((s) => s.name)
         : [opts.skill as string];
-      for (const skill of targets) {
-        const res = await updateSkill({ agent, skill, force: opts.force === true });
-        process.stdout.write(`Updated ${skill} → ${res.installedPath}\n`);
+      const results = await updateSkills({ agent, skills: targets, force: opts.force === true });
+      for (const res of results) {
+        process.stdout.write(`Updated ${res.skill} → ${res.installedPath}\n`);
       }
     });
 

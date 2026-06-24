@@ -96,6 +96,9 @@ time — a divergent checksum means you edited the skill locally. Pass `--force`
 to overwrite, or detach the skill first to make it a pure local copy (which
 removes the manifest).
 
+With `--all`, skills that share the same source (and ref) are grouped so each
+source is fetched only once, rather than re-cloned per skill.
+
 ## Removing
 
 ```bash
