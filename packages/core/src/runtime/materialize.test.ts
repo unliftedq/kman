@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Profile } from '@kman/types';
 import { agentDir } from '../paths.js';
-import { materializeRuntimePlugin, pluginLayoutForBackend } from './materialize.js';
-import { runtimePluginDir } from './paths.js';
+import { materializePiRuntime, materializeRuntimePlugin, pluginLayoutForBackend } from './materialize.js';
+import { runtimePiDir, runtimePluginDir } from './paths.js';
 
 function mkProfile(overrides: Partial<Profile> = {}): Profile {
   return {
@@ -274,5 +274,74 @@ describe('materializeRuntimePlugin', () => {
       (e) => e.includes('.staging-') || e.includes('.trash-'),
     );
     expect(leftovers).toEqual([]);
+  });
+});
+
+describe('materializePiRuntime', () => {
+  const originalHome = process.env['KMAN_HOME'];
+  let home: string;
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), 'kman-pi-'));
+    process.env['KMAN_HOME'] = home;
+    const dir = agentDir('coder');
+    await mkdir(join(dir, 'skills', 'humanizer'), { recursive: true });
+    await writeFile(join(dir, 'skills', 'humanizer', 'SKILL.md'), '# skill\n', 'utf8');
+    await mkdir(join(dir, 'commands'), { recursive: true });
+    await writeFile(join(dir, 'commands', 'review.md'), '# review\n', 'utf8');
+    await writeFile(join(dir, 'mcp.json'), '{"mcpServers":{}}\n', 'utf8');
+    await writeFile(join(dir, 'soul.md'), '---\nname: coder\n---\n\nYou are coder.\n', 'utf8');
+  });
+
+  afterEach(async () => {
+    if (originalHome === undefined) delete process.env['KMAN_HOME'];
+    else process.env['KMAN_HOME'] = originalHome;
+    await rm(home, { recursive: true, force: true });
+  });
+
+  test('returns the .pi resource dir path', async () => {
+    const piDir = await materializePiRuntime(mkProfile());
+    expect(piDir).toBe(runtimePiDir('coder'));
+  });
+
+  test('links skills through unchanged', async () => {
+    const piDir = await materializePiRuntime(mkProfile());
+    expect(await readFile(join(piDir, 'skills', 'humanizer', 'SKILL.md'), 'utf8')).toContain(
+      '# skill',
+    );
+  });
+
+  test('maps commands/ to prompts/ for pi slash-command templates', async () => {
+    const piDir = await materializePiRuntime(mkProfile());
+    expect(await readFile(join(piDir, 'prompts', 'review.md'), 'utf8')).toContain('# review');
+  });
+
+  test('exposes the agent mcp.json as-is (no dotfile rename)', async () => {
+    const piDir = await materializePiRuntime(mkProfile());
+    expect(await readFile(join(piDir, 'mcp.json'), 'utf8')).toContain('mcpServers');
+  });
+
+  test('does not emit a plugin manifest — pi is an embedded SDK', async () => {
+    const piDir = await materializePiRuntime(mkProfile());
+    let present = true;
+    try {
+      await lstat(join(piDir, '.claude-plugin'));
+    } catch {
+      present = false;
+    }
+    expect(present).toBe(false);
+  });
+
+  test('rebuilds from scratch, dropping stale resources', async () => {
+    await materializePiRuntime(mkProfile());
+    await rm(join(agentDir('coder'), 'skills'), { recursive: true, force: true });
+    const piDir = await materializePiRuntime(mkProfile());
+    let present = true;
+    try {
+      await lstat(join(piDir, 'skills'));
+    } catch {
+      present = false;
+    }
+    expect(present).toBe(false);
   });
 });
