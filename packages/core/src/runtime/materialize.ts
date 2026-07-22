@@ -4,7 +4,7 @@ import { isAbsolute, dirname, join } from 'node:path';
 import type { BackendName, Profile } from '@kman/types';
 import { agentDir, agentSoulPath } from '../paths.js';
 import { promptCommandFiles } from '../mcp-prompts/index.js';
-import { KMAN_PLUGIN_NAME, runtimePluginDir, type PluginLayout } from './paths.js';
+import { KMAN_PLUGIN_NAME, runtimePiDir, runtimePluginDir, type PluginLayout } from './paths.js';
 
 /**
  * Component directories that, when present in the agent directory, are exposed
@@ -90,6 +90,77 @@ export async function materializeRuntimePlugin(
     pluginDir,
     pluginAgent: `${KMAN_PLUGIN_NAME}:${profile.name}`,
   };
+}
+
+/**
+ * Component directories projected into the pi resource dir. pi's
+ * DefaultResourceLoader discovers `skills/` and `prompts/` under its agentDir,
+ * and the agent's own `hooks/`/`scripts/`/`bin/` are carried through so any
+ * paths referenced from skills or MCP config keep resolving.
+ */
+const PI_LINKED_DIRS = ['skills', 'hooks', 'scripts', 'bin'] as const;
+
+/**
+ * Project an agent directory into the pi resource/agent directory under
+ * ~/.kman/runtime/<name>/.pi, and return its absolute path for pi's SDK
+ * `agentDir` / DefaultResourceLoader.
+ *
+ * Unlike {@link materializeRuntimePlugin}, pi is embedded as an SDK, so there
+ * is no plugin manifest and no contributed agent file: the soul is delivered
+ * at runtime as pi's system prompt (systemPromptOverride) by the pi runner.
+ * This function only exposes the agent's curated resources:
+ *  - `skills/`   → `skills/`   (pi global skills discovery)
+ *  - `commands/` → `prompts/`  (pi slash-command prompt templates)
+ *  - `mcp.json`  → `mcp.json`  (MCP server configuration)
+ *  - hooks/scripts/bin carried through unchanged
+ *
+ * Uses the same atomic staging + swap as the plugin materializer so a reader
+ * never observes a half-built resource dir, and deletions in the agent dir do
+ * not linger as stale links.
+ */
+export async function materializePiRuntime(profile: Profile): Promise<string> {
+  const src = agentDir(profile.name);
+  const piDir = runtimePiDir(profile.name);
+  const staging = `${piDir}.staging-${process.pid}-${randomUUID()}`;
+
+  try {
+    await buildPiResources(staging, src);
+    await swapIntoPlace(staging, piDir);
+  } catch (err) {
+    await rm(staging, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
+
+  return piDir;
+}
+
+/** Build the pi resource tree under `piDir` (expected to be a staging dir). */
+async function buildPiResources(piDir: string, src: string): Promise<void> {
+  await mkdir(piDir, { recursive: true });
+
+  for (const dir of PI_LINKED_DIRS) {
+    const from = join(src, dir);
+    if (await pathExists(from)) {
+      await linkOrCopy(from, join(piDir, dir), 'dir');
+    }
+  }
+
+  // The agent's `commands/` become pi prompt templates under `prompts/`.
+  const commands = join(src, 'commands');
+  if (await pathExists(commands)) {
+    await linkOrCopy(commands, join(piDir, 'prompts'), 'dir');
+  }
+
+  // MCP config: the agent keeps a plain `mcp.json` (legacy `.mcp.json`); pi
+  // reads `mcp.json` from its agent dir.
+  let mcp = join(src, 'mcp.json');
+  if (!(await pathExists(mcp))) {
+    const legacy = join(src, '.mcp.json');
+    if (await pathExists(legacy)) mcp = legacy;
+  }
+  if (await pathExists(mcp)) {
+    await linkOrCopy(mcp, join(piDir, 'mcp.json'), 'file');
+  }
 }
 
 /** Build a complete plugin tree under `pluginDir` (expected to be a staging dir). */

@@ -3,7 +3,7 @@ import type { ConfigDefaults, KmanConfig } from '@kman/types';
 /** Built-in fallback used when config.json is absent or a field is unset. */
 export const BUILTIN_CONFIG: KmanConfig = {
   defaults: {
-    runtime: 'claude-code',
+    runtime: 'pi',
   },
 };
 

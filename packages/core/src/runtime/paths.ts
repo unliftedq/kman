@@ -33,3 +33,16 @@ export function runtimeAgentRoot(name: string): string {
 export function runtimePluginDir(name: string, layout: PluginLayout): string {
   return join(runtimeAgentRoot(name), layout === 'claude' ? '.claude' : '.copilot');
 }
+
+/**
+ * The materialized pi resource/agent directory kman points pi's SDK
+ * (`agentDir` / DefaultResourceLoader) at: ~/.kman/runtime/<name>/.pi.
+ *
+ * pi is embedded as an SDK, so — unlike claude/copilot — there is no plugin
+ * manifest. The directory instead mirrors pi's own agent-dir layout (skills/,
+ * prompts/, AGENTS.md, models.json/auth.json discovery) so the agent's curated
+ * resources are exposed to the in-process session.
+ */
+export function runtimePiDir(name: string): string {
+  return join(runtimeAgentRoot(name), '.pi');
+}

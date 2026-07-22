@@ -2,7 +2,7 @@
  * Profile schema — mirrors agent.toml on disk (§5.1).
  */
 
-export type BackendName = 'claude-code' | 'copilot-cli' | (string & {});
+export type BackendName = 'pi' | 'claude-code' | 'copilot-cli' | (string & {});
 
 export type PermissionLevel = 'ask' | 'auto' | 'yolo';
 

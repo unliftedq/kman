@@ -86,7 +86,7 @@ export function buildConfigCommand(): Command {
       rejectAgent('config unset');
       const k = assertSettableKey(key);
       if (k === 'defaults.runtime') {
-        throw new UserError('defaults.runtime cannot be unset; set it to claude-code or copilot-cli instead.');
+        throw new UserError('defaults.runtime cannot be unset; set it to pi, claude-code, or copilot-cli instead.');
       }
       const config = await readConfig();
       delete config.defaults[keyField(k)];
