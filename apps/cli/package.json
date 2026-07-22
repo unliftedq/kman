@@ -51,6 +51,7 @@
   "devDependencies": {
     "@kman/backend-claude-code": "workspace:*",
     "@kman/backend-copilot-cli": "workspace:*",
+    "@kman/backend-pi": "workspace:*",
     "@kman/core": "workspace:*",
     "@kman/daemon": "workspace:*",
     "@kman/mcp-server": "workspace:*",
