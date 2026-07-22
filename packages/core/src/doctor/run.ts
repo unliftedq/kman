@@ -1,5 +1,5 @@
 import { runAgentChecks, DEFAULT_BACKEND_PROBES, type BackendProbe } from './agent-checks.js';
-import { checkBackend } from './backend.js';
+import { checkBackend, checkPiSdk } from './backend.js';
 import { kmanHome, configPath } from '../paths.js';
 import { readConfig } from '../config/read.js';
 import { isKnownBackend } from '../config/validate.js';
@@ -43,10 +43,13 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<Report> {
   });
 
   const probes = opts.backends ?? DEFAULT_BACKEND_PROBES;
-  const probeResults = await Promise.all(probes.map((p) => checkBackend(p)));
+  const [probeResults, piChecks] = await Promise.all([
+    Promise.all(probes.map((p) => checkBackend(p))),
+    checkPiSdk(),
+  ]);
   sections.push({
     title: 'Backends',
-    checks: probeResults.flat(),
+    checks: [...piChecks, ...probeResults.flat()],
   });
 
   if (opts.agent) {

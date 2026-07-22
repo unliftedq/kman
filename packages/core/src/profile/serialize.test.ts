@@ -10,7 +10,7 @@ describe('serializeProfile', () => {
     const body = serializeProfile(p);
     const parsed = parseProfileToml('coder', TOML.parse(body));
     expect(parsed.name).toBe('coder');
-    expect(parsed.runtime.default).toBe('claude-code');
+    expect(parsed.runtime.default).toBe('pi');
     expect(parsed.soul.prompt_file).toBe('soul.md');
     expect(parsed.defaults.permission_mode).toBe('ask');
     expect(parsed.defaults.output_format).toBe('text');

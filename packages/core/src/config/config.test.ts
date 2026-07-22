@@ -10,8 +10,8 @@ import { serializeConfig, writeConfig } from './write.js';
 import { validateConfig } from './validate.js';
 
 describe('config schema', () => {
-  test('defaultConfig falls back to claude-code', () => {
-    expect(defaultConfig().defaults.runtime).toBe('claude-code');
+  test('defaultConfig falls back to pi', () => {
+    expect(defaultConfig().defaults.runtime).toBe('pi');
   });
 
   test('mergeConfig overlays partial defaults over built-in', () => {
@@ -22,7 +22,7 @@ describe('config schema', () => {
 
   test('mergeConfig keeps built-in runtime when partial omits it', () => {
     const merged = mergeConfig({ defaults: { max_turns: 10 } as never });
-    expect(merged.defaults.runtime).toBe('claude-code');
+    expect(merged.defaults.runtime).toBe('pi');
     expect(merged.defaults.max_turns).toBe(10);
   });
 });

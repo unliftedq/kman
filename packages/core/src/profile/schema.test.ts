@@ -9,7 +9,7 @@ import {
 
 describe('schema constants', () => {
   test('KNOWN_BACKENDS lists v1 adapters', () => {
-    expect(KNOWN_BACKENDS).toEqual(['claude-code', 'copilot-cli']);
+    expect(KNOWN_BACKENDS).toEqual(['pi', 'claude-code', 'copilot-cli']);
   });
 
   test('PERMISSION_LEVELS lists the abstract levels', () => {
@@ -29,7 +29,7 @@ describe('defaultProfile', () => {
   test('fills in safe defaults when no overrides are passed', () => {
     const p = defaultProfile('coder');
     expect(p.name).toBe('coder');
-    expect(p.runtime.default).toBe('claude-code');
+    expect(p.runtime.default).toBe('pi');
     expect(p.runtime.model).toBeUndefined();
     expect(p.soul.prompt_file).toBe('soul.md');
     expect(p.defaults.permission_mode).toBe('ask');
@@ -53,9 +53,9 @@ describe('defaultProfile', () => {
     expect(p.description).toBe('a description');
   });
 
-  test('falls back to claude-code when runtime override omits default', () => {
+  test('falls back to pi when runtime override omits default', () => {
     const p = defaultProfile('x', { runtime: { default: undefined as unknown as string } });
-    expect(p.runtime.default).toBe('claude-code');
+    expect(p.runtime.default).toBe('pi');
   });
 
   test('preserves runtimeOverrides when supplied', () => {

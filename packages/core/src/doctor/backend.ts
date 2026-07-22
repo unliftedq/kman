@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import type { Check } from './types.js';
 
 /**
@@ -151,4 +152,44 @@ export async function checkBackend(probe: BackendProbe): Promise<Check[]> {
       message: result.version ?? '(unknown)',
     },
   ];
+}
+
+/**
+ * pi is embedded as an SDK (`@earendil-works/pi-coding-agent`) rather than an
+ * external PATH binary, so it is probed by module resolution instead of a
+ * `--version` spawn. A missing SDK is a warning (not an error): pi is the
+ * default runtime, but agents can still run by selecting another runtime with
+ * `--runtime claude-code` / `--runtime copilot-cli`, and the pi runner surfaces
+ * the same actionable message at launch time.
+ */
+export async function checkPiSdk(): Promise<Check[]> {
+  const id = 'backend.pi.sdk';
+  const label = 'pi SDK';
+  try {
+    // Resolve by specifier without importing: core must not take a hard
+    // dependency on a specific backend's SDK, and resolution alone is enough
+    // to confirm the package is installed and reachable.
+    const require = createRequire(import.meta.url);
+    require.resolve('@earendil-works/pi-coding-agent');
+    return [
+      {
+        id,
+        label,
+        severity: 'ok',
+        message: '@earendil-works/pi-coding-agent resolved.',
+      },
+    ];
+  } catch (err) {
+    return [
+      {
+        id,
+        label,
+        severity: 'warn',
+        message: '@earendil-works/pi-coding-agent not available.',
+        detail:
+          'Install the pi SDK to use the default pi runtime, or select another runtime with `--runtime claude-code` / `--runtime copilot-cli`. ' +
+          `Underlying error: ${(err as Error).message}`,
+      },
+    ];
+  }
 }

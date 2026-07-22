@@ -78,6 +78,15 @@ describe('attachKmanMcp', () => {
     expect(augmented).toBe(ctx);
   });
 
+  it('fails open for pi, which has no MCP-config flag', async () => {
+    // pi is embedded as an SDK with no `--mcp-config` equivalent, so the
+    // self-MCP server is not injected. The launch must proceed unchanged
+    // rather than break.
+    const ctx = makeCtx('coder', ['--keep'], 'pi');
+    const augmented = await attachKmanMcp(ctx);
+    expect(augmented).toBe(ctx);
+  });
+
   it('skips --mcp-config when `kman` is already installed in ~/.claude.json — but still sets env', async () => {
     // Reproduces the install-vs-inject collision: if both paths register
     // `kman`, hosts merge them with undefined precedence. We let the
