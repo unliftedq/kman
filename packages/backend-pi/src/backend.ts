@@ -23,10 +23,11 @@ import type {
  * launches as a child process. The runner imports pi's SDK directly, so pi
  * runs as embedded library code owned by kman rather than an opaque binary.
  *
- * Permission mapping (abstract → pi):
- *   ask    → interactive tool approval (pi default)
- *   auto   → auto-approve edits/reads, still gate destructive shell
- *   yolo   → approve every tool call (pi's allow-all)
+ * Permission mapping (abstract → pi): the level is forwarded to the runner via
+ * KMAN_PI_PERMISSION, which translates it into pi's tool allowlist (pi's SDK has
+ * no per-run approval callback at this embedding layer):
+ *   ask / auto → read-only tools only (read/grep/find/ls)
+ *   yolo       → full coding tools (read/write/edit/bash + search)
  */
 const PERMISSION_MAP: Record<PermissionLevel, string> = {
   ask: 'ask',
@@ -99,14 +100,10 @@ export class PiBackend implements Backend {
       KMAN_PI_PERMISSION: permission,
       KMAN_PI_CWD: ctx.cwd,
       KMAN_PI_AGENT_DIR: resourceDir,
-      KMAN_PI_OUTPUT_FORMAT: ctx.outputFormat,
       KMAN_PI_INTERACTIVE: interactive ? '1' : '0',
-      KMAN_PI_STREAM: ctx.stream ? '1' : '0',
     };
     if (ctx.model !== undefined) env['KMAN_PI_MODEL'] = ctx.model;
-    if (ctx.maxTurns !== undefined) env['KMAN_PI_MAX_TURNS'] = String(ctx.maxTurns);
     if (ctx.task !== undefined) env['KMAN_PI_TASK'] = ctx.task;
-    if (ctx.extraArgs.length > 0) env['KMAN_PI_EXTRA_ARGS'] = JSON.stringify(ctx.extraArgs);
 
     return env;
   }

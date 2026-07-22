@@ -88,9 +88,7 @@ describe('PiBackend env serialization', () => {
     expect(env['KMAN_PI_SOUL']).toBe('You are coder.');
     expect(env['KMAN_PI_PERMISSION']).toBe('ask');
     expect(env['KMAN_PI_CWD']).toBe('/tmp/work');
-    expect(env['KMAN_PI_OUTPUT_FORMAT']).toBe('text');
     expect(env['KMAN_PI_INTERACTIVE']).toBe('0');
-    expect(env['KMAN_PI_STREAM']).toBe('0');
     // AGENT_DIR points at the materialized .pi resource dir.
     expect(env['KMAN_PI_AGENT_DIR']).toMatch(/\.pi$/);
   });
@@ -111,19 +109,15 @@ describe('PiBackend env serialization', () => {
     const b = new PiBackend();
     const bare = await envFor(b, mkCtx(), false);
     expect(bare['KMAN_PI_MODEL']).toBeUndefined();
-    expect(bare['KMAN_PI_MAX_TURNS']).toBeUndefined();
     expect(bare['KMAN_PI_TASK']).toBeUndefined();
-    expect(bare['KMAN_PI_EXTRA_ARGS']).toBeUndefined();
 
     const full = await envFor(
       b,
-      mkCtx({ model: 'gpt-5', maxTurns: 12, task: 'do it', extraArgs: ['--debug'] }),
+      mkCtx({ model: 'gpt-5', task: 'do it' }),
       false,
     );
     expect(full['KMAN_PI_MODEL']).toBe('gpt-5');
-    expect(full['KMAN_PI_MAX_TURNS']).toBe('12');
     expect(full['KMAN_PI_TASK']).toBe('do it');
-    expect(full['KMAN_PI_EXTRA_ARGS']).toBe(JSON.stringify(['--debug']));
   });
 
   test('inherited ctx.env is preserved alongside KMAN_PI_* vars', async () => {

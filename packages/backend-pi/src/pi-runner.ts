@@ -13,13 +13,9 @@
  *   KMAN_PI_PERMISSION     ask | auto | yolo | <raw>
  *   KMAN_PI_CWD            working directory for tools
  *   KMAN_PI_AGENT_DIR      pi resource/agent dir (skills, prompts, AGENTS.md)
- *   KMAN_PI_OUTPUT_FORMAT  text | json | stream-json
  *   KMAN_PI_INTERACTIVE    "1" for chat, "0" for one-shot run
- *   KMAN_PI_STREAM         "1" to stream partial output
  *   KMAN_PI_MODEL          optional "provider/id" or "id"
- *   KMAN_PI_MAX_TURNS      optional integer
  *   KMAN_PI_TASK           one-shot prompt (run mode)
- *   KMAN_PI_EXTRA_ARGS     JSON string[] of pass-through flags
  */
 
 interface RunnerEnv {
@@ -27,43 +23,39 @@ interface RunnerEnv {
   permission: string;
   cwd: string;
   agentDir: string;
-  outputFormat: string;
   interactive: boolean;
-  stream: boolean;
   model?: string;
-  maxTurns?: number;
   task?: string;
-  extraArgs: string[];
 }
 
 function readEnv(): RunnerEnv {
   const env = process.env;
-  const extraArgsRaw = env['KMAN_PI_EXTRA_ARGS'];
-  let extraArgs: string[] = [];
-  if (extraArgsRaw) {
-    try {
-      const parsed = JSON.parse(extraArgsRaw);
-      if (Array.isArray(parsed)) extraArgs = parsed.map(String);
-    } catch {
-      /* ignore malformed extra args */
-    }
-  }
-  const maxTurnsRaw = env['KMAN_PI_MAX_TURNS'];
-  const maxTurns = maxTurnsRaw ? Number.parseInt(maxTurnsRaw, 10) : undefined;
-
   return {
     soul: env['KMAN_PI_SOUL'] ?? '',
     permission: env['KMAN_PI_PERMISSION'] ?? 'ask',
     cwd: env['KMAN_PI_CWD'] ?? process.cwd(),
     agentDir: env['KMAN_PI_AGENT_DIR'] ?? '',
-    outputFormat: env['KMAN_PI_OUTPUT_FORMAT'] ?? 'text',
     interactive: env['KMAN_PI_INTERACTIVE'] === '1',
-    stream: env['KMAN_PI_STREAM'] === '1',
     ...(env['KMAN_PI_MODEL'] ? { model: env['KMAN_PI_MODEL'] } : {}),
-    ...(maxTurns !== undefined && !Number.isNaN(maxTurns) ? { maxTurns } : {}),
     ...(env['KMAN_PI_TASK'] !== undefined ? { task: env['KMAN_PI_TASK'] } : {}),
-    extraArgs,
   };
+}
+
+/**
+ * Translate kman's abstract permission level into pi's tool allowlist. pi's SDK
+ * has no interactive per-tool approval callback exposed at this embedding layer,
+ * so the enforceable lever is which built-in tools the session may call:
+ *
+ *   yolo          → full coding tools (read/write/edit/bash + search).
+ *   ask / auto /  → read-only tools (read/grep/find/ls) only; the mutating
+ *   anything else   tools (write/edit/bash) are withheld so an unattended run
+ *                   cannot make un-approved changes.
+ */
+function toolsForPermission(permission: string): string[] {
+  if (permission === 'yolo') {
+    return ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls'];
+  }
+  return ['read', 'grep', 'find', 'ls'];
 }
 
 /**
@@ -135,6 +127,7 @@ async function main(): Promise<number> {
     ...(model ? { model: model as never } : {}),
     resourceLoader: loader,
     sessionManager,
+    tools: toolsForPermission(cfg.permission),
   });
 
   // Stream assistant text to stdout so the launcher / daemon log capture it.
