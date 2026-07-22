@@ -141,7 +141,11 @@ async function main(): Promise<number> {
       process.stdout.write(event.assistantMessageEvent.delta);
     }
     if (event.type === 'tool_execution_end' && event.isError) {
-      process.stderr.write(`\npi: tool error\n`);
+      const e = event as { toolName?: string; error?: unknown };
+      const tool = e.toolName ?? 'unknown';
+      const detail =
+        e.error instanceof Error ? e.error.message : e.error != null ? String(e.error) : '';
+      process.stderr.write(`\npi: tool error [${tool}]${detail ? `: ${detail}` : ''}\n`);
     }
   });
 
