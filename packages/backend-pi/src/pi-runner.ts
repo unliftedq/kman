@@ -141,10 +141,15 @@ async function main(): Promise<number> {
       process.stdout.write(event.assistantMessageEvent.delta);
     }
     if (event.type === 'tool_execution_end' && event.isError) {
-      const e = event as { toolName?: string; error?: unknown };
-      const tool = e.toolName ?? 'unknown';
-      const detail =
-        e.error instanceof Error ? e.error.message : e.error != null ? String(e.error) : '';
+      // Best-effort enrichment: read the tool name / error detail if the SDK
+      // event carries them. These fields are accessed defensively (rather than
+      // via the typed event) because their exact names are not guaranteed
+      // across pi SDK versions; a missing field degrades to a generic message
+      // rather than a crash.
+      const e = event as Record<string, unknown>;
+      const tool = typeof e['toolName'] === 'string' ? e['toolName'] : 'unknown';
+      const raw = e['error'];
+      const detail = raw instanceof Error ? raw.message : raw != null ? String(raw) : '';
       process.stderr.write(`\npi: tool error [${tool}]${detail ? `: ${detail}` : ''}\n`);
     }
   });

@@ -42,7 +42,7 @@ description = "Senior backend engineer agent"
 
 [runtime]
 default = "pi"                           # pi (embedded, default) | claude-code | copilot-cli
-model   = "claude-sonnet-4.5"            # passed to backend; backend default if omitted
+model   = "gpt-5"                        # passed to backend; backend default if omitted
 
 [soul]
 prompt_file = "soul.md"                  # relative to agent dir; default "soul.md"
