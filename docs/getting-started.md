@@ -51,7 +51,7 @@ bun run test        # turbo run test
 ## Quick start
 
 ```bash
-# 1. Create a specialized agent (claude-code by default).
+# 1. Create a specialized agent (embedded pi runtime by default).
 kman agent create coder
 
 # 2. Edit its soul prompt — the file body becomes the agent's system prompt.

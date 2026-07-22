@@ -22,7 +22,7 @@ commands require `--agent`; non-agent commands (like `config`) reject it.
 
 ```bash
 kman agent create <name> [flags]
-  --runtime <backend>          # default backend (claude-code | copilot-cli)
+  --runtime <backend>          # default backend (pi | claude-code | copilot-cli)
   --model <id>                 # default model
   --description "<text>"       # short label for what the agent is for
   --soul "<text>"              # initial soul prompt body (written to soul.md)

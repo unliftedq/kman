@@ -25,7 +25,7 @@ via `kman config set`.
 
 | Key | Values | Notes |
 |---|---|---|
-| `defaults.runtime` | `claude-code` \| `copilot-cli` | Default backend for new agents. May also name a future backend (forward-compat); `kman doctor` warns. |
+| `defaults.runtime` | `pi` \| `claude-code` \| `copilot-cli` | Default backend for new agents (built-in default: `pi`, the embedded runtime). May also name a future backend (forward-compat); `kman doctor` warns. |
 | `defaults.model` | model id string | Optional. |
 | `defaults.permission_mode` | `ask` \| `auto` \| `yolo` | Optional. |
 | `defaults.output_format` | `text` \| `json` \| `stream-json` | Optional. |
@@ -33,7 +33,7 @@ via `kman config set`.
 
 Behavior:
 
-- **Missing file is not an error.** When `config.json` is absent, kman falls back to a built-in baseline (`defaults.runtime = "claude-code"`), so first-run usage works with zero setup.
+- **Missing file is not an error.** When `config.json` is absent, kman falls back to a built-in baseline (`defaults.runtime = "pi"`, the embedded runtime), so first-run usage works with zero setup and no external CLI to install.
 - **Precedence at create time.** An explicit `agent create` flag always wins; otherwise the value comes from `config.json`; otherwise the built-in default.
 - **Existing agents are never rewritten** when `config.json` changes — only future creations read it.
 - **Validated on read/write.** `permission_mode`, `output_format`, and `max_turns` are checked against the same rules as `agent.toml`.
