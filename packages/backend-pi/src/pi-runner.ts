@@ -18,6 +18,8 @@
  *   KMAN_PI_TASK           one-shot prompt (run mode)
  */
 
+import { pathToFileURL } from 'node:url';
+
 interface RunnerEnv {
   soul: string;
   permission: string;
@@ -51,7 +53,7 @@ function readEnv(): RunnerEnv {
  *   anything else   tools (write/edit/bash) are withheld so an unattended run
  *                   cannot make un-approved changes.
  */
-function toolsForPermission(permission: string): string[] {
+export function toolsForPermission(permission: string): string[] {
   if (permission === 'yolo') {
     return ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls'];
   }
@@ -180,10 +182,16 @@ async function runInteractive(session: {
   rl.close();
 }
 
-main()
-  .then((code) => process.exit(code))
-  .catch((err) => {
-    const message = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`${message}\n`);
-    process.exit(1);
-  });
+// Auto-run only when launched as the entry script (PiBackend spawns it as a
+// child process). Guarding this lets tests import the module — e.g. to unit
+// test `toolsForPermission` — without executing the SDK path or calling
+// process.exit.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+    .then((code) => process.exit(code))
+    .catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`${message}\n`);
+      process.exit(1);
+    });
+}

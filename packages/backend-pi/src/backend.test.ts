@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { AgentContext } from '@kman/types';
 import { agentDir } from '@kman/core';
 import { PiBackend, createPiBackend } from './backend.js';
+import { toolsForPermission } from './pi-runner.js';
 
 function mkCtx(overrides: Partial<AgentContext> = {}): AgentContext {
   return {
@@ -125,5 +126,33 @@ describe('PiBackend env serialization', () => {
     const env = await envFor(b, mkCtx({ env: { KMAN_TASK_ID: 't_1' } }), false);
     expect(env['KMAN_TASK_ID']).toBe('t_1');
     expect(env['KMAN_PI_SOUL']).toBe('You are coder.');
+  });
+});
+
+describe('toolsForPermission', () => {
+  test('yolo grants the full mutating coding tool set', () => {
+    expect(toolsForPermission('yolo')).toEqual([
+      'read',
+      'write',
+      'edit',
+      'bash',
+      'grep',
+      'find',
+      'ls',
+    ]);
+  });
+
+  test('ask and auto are read-only — no write/edit/bash', () => {
+    for (const level of ['ask', 'auto']) {
+      const tools = toolsForPermission(level);
+      expect(tools).toEqual(['read', 'grep', 'find', 'ls']);
+      expect(tools).not.toContain('write');
+      expect(tools).not.toContain('edit');
+      expect(tools).not.toContain('bash');
+    }
+  });
+
+  test('unknown permission strings fall back to read-only', () => {
+    expect(toolsForPermission('garbage')).toEqual(['read', 'grep', 'find', 'ls']);
   });
 });

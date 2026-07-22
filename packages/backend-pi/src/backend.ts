@@ -23,11 +23,12 @@ import type {
  * launches as a child process. The runner imports pi's SDK directly, so pi
  * runs as embedded library code owned by kman rather than an opaque binary.
  *
- * Permission mapping (abstract → pi): the level is forwarded to the runner via
- * KMAN_PI_PERMISSION, which translates it into pi's tool allowlist (pi's SDK has
- * no per-run approval callback at this embedding layer):
- *   ask / auto → read-only tools only (read/grep/find/ls)
- *   yolo       → full coding tools (read/write/edit/bash + search)
+ * Permission mapping (abstract → pi): this backend only forwards the abstract
+ * level to the runner via KMAN_PI_PERMISSION as an identity string; the actual
+ * enforcement — translating the level into pi's tool allowlist (read-only for
+ * ask/auto, full coding tools for yolo) — happens in the runner's
+ * `toolsForPermission` (pi-runner.ts), because pi's SDK has no per-run approval
+ * callback at this embedding layer.
  */
 const PERMISSION_MAP: Record<PermissionLevel, string> = {
   ask: 'ask',
