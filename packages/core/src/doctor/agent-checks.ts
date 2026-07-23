@@ -3,7 +3,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { agentDir, agentSkillsDir, agentSoulPath } from '../paths.js';
 import { readProfile } from '../profile/index.js';
 import { type Profile } from '@kman/types';
-import { checkBackend, DEFAULT_BACKEND_PROBES, type BackendProbe } from './backend.js';
+import { checkBackend, checkPiSdk, DEFAULT_BACKEND_PROBES, type BackendProbe } from './backend.js';
 import type { Check } from './types.js';
 
 const SHADOWING_DENYLIST: readonly string[] = [
@@ -442,19 +442,27 @@ export async function runAgentChecks(agent: string): Promise<Check[]> {
   // Specifically confirm the agent's default backend is reachable, with a
   // dedicated row that references the agent's chosen runtime.
   if (profile) {
-    const probe = DEFAULT_BACKEND_PROBES.find((p) => p.name === profile.runtime.default);
-    if (!probe) {
-      out.push({
-        id: 'agent.backend.known',
-        label: `runtime=${profile.runtime.default}`,
-        severity: 'warn',
-        message: `no built-in probe for backend "${profile.runtime.default}".`,
-      });
-    } else {
-      const checks = await checkBackend(probe);
-      // Re-id so they don't collide with the global backend section.
+    if (profile.runtime.default === 'pi') {
+      // pi is embedded, so probe the SDK rather than a PATH binary.
+      const checks = await checkPiSdk();
       for (const c of checks) {
         out.push({ ...c, id: `agent.${c.id}` });
+      }
+    } else {
+      const probe = DEFAULT_BACKEND_PROBES.find((p) => p.name === profile.runtime.default);
+      if (!probe) {
+        out.push({
+          id: 'agent.backend.known',
+          label: `runtime=${profile.runtime.default}`,
+          severity: 'warn',
+          message: `no built-in probe for backend "${profile.runtime.default}".`,
+        });
+      } else {
+        const checks = await checkBackend(probe);
+        // Re-id so they don't collide with the global backend section.
+        for (const c of checks) {
+          out.push({ ...c, id: `agent.${c.id}` });
+        }
       }
     }
   }

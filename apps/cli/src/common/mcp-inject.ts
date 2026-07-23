@@ -87,6 +87,14 @@ function mcpConfigFlagFor(backend: BackendName): McpConfigFlagSpec | undefined {
       return { flag: '--mcp-config' };
     case 'copilot-cli':
       return { flag: '--additional-mcp-config', pathPrefix: '@' };
+    // pi is embedded as an SDK, not a flag-driven CLI: it has no equivalent
+    // `--mcp-config` flag, and its SDK exposes no documented per-launch MCP
+    // config input. kman's self-MCP server (agent-to-agent dispatch) is
+    // therefore not injected into pi here; pi still consumes the agent's own
+    // `mcp.json`, which materializePiRuntime links into its resource dir.
+    // Returning undefined makes attachKmanMcp fail open for pi.
+    case 'pi':
+      return undefined;
     default:
       return undefined;
   }

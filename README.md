@@ -4,7 +4,7 @@
 
 > Multi-agent management tool, *name is inspired by [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)* — a small society of named, well-tailored agents you can dispatch on a mission.
 
-`kman` sits *above* existing agent runtimes (Claude Code, GitHub Copilot CLI, ...) and gives each named agent its own isolated directory, soul prompt, skills, hooks, and MCP servers. One CLI dispatches them all while keeping each agent's files separate and portable.
+`kman` gives each named agent its own isolated directory, soul prompt, skills, hooks, and MCP servers, and runs it on the embedded **pi** agent runtime by default — or *above* an external runtime (Claude Code, GitHub Copilot CLI, …) when you select one. One CLI dispatches them all while keeping each agent's files separate and portable.
 
 See the [docs](docs/README.md) for the architecture and full usage guide, or jump straight to the published CLI: **[`@unliftedq/kman`](apps/cli/README.md)**.
 
@@ -17,7 +17,7 @@ Concretely, that buys you:
 - **Context isolation, not skill bloat.** Each agent only sees its own `~/.kman/agents/<name>/` directory — its own skills, hooks, MCP servers, and soul prompt. Skills are *not* eagerly merged into one giant catalog shared by every session, so a `coder` agent doesn't pay tokens for a `researcher`'s web-scraping skills, and vice versa. Smaller context → cheaper runs, faster responses, fewer "lost in the middle" failures.
 - **Focus by construction.** An agent is defined by a single soul prompt plus a curated set of skills/tools. Because the surface area is intentionally narrow, the model is biased toward what it's actually good at instead of negotiating between dozens of half-relevant capabilities. You get specialists (`coder`, `reviewer`, `researcher`, `release-bot`, …) rather than one overworked generalist.
 - **Blast-radius isolation.** Permissions, MCP servers, and hooks are scoped per agent, not global. A `researcher` that browses the open web doesn't share credentials or write-access with a `release-bot` that can push tags. Misbehavior — accidental `rm -rf`, prompt injection from a fetched page, an over-eager tool call — is contained to the agent that was dispatched, not your whole toolchain.
-- **Backend-agnostic, profile-portable.** The same named agent profile runs on top of `claude-code` and `copilot-cli` today, with `codex` / `gemini` adapters tractable as future work. You isolate *the agent*, not *the vendor*: switching backends doesn't mean re-curating skills, hooks, and prompts from scratch.
+- **Backend-agnostic, profile-portable.** By default agents run on the embedded `pi` runtime (shipped as part of kman, no external CLI to install), and the same named agent profile also runs on top of `claude-code` and `copilot-cli`, with `codex` / `gemini` adapters tractable as future work. You isolate *the agent*, not *the vendor*: switching backends doesn't mean re-curating skills, hooks, and prompts from scratch.
 - **Reproducible and shareable.** Because every agent is just a directory of plain data, agents are versionable, diffable, and shareable. Teams can ship a `frontend-reviewer` the same way they ship a linter config, instead of passing around a 3-page system prompt in Notion.
 - **Composable instead of monolithic.** v1 keeps cross-agent composition simple — shell pipes between `kman run --agent ...` invocations — but the isolation boundary is the same one future multi-agent flows, desktop UIs, and remote gateways will build on. You don't have to re-architect later to get sub-agent delegation; the agents are already separate citizens.
 
@@ -47,6 +47,7 @@ Browse the repo for concrete examples you can copy, adapt, or dispatch directly 
 
 | Backend | Status | Notes |
 |---|---|---|
+| `pi` | ✅ supported (default) | embedded SDK (`@earendil-works/pi-coding-agent`); no external CLI required |
 | `claude-code` | ✅ supported | requires `claude` on PATH (or `KMAN_CLAUDE_BIN`) |
 | `copilot-cli` | ✅ supported | requires `copilot` on PATH (or `KMAN_COPILOT_BIN`) |
 | `codex` / `gemini` | future | not implemented |
@@ -58,7 +59,8 @@ Pre-1.0. Layout and flag surface may still change.
 ```bash
 bun install
 bun run kman --help
-bun run kman agent create coder --runtime claude-code
+bun run kman agent create coder            # embedded pi runtime by default
+bun run kman agent create reviewer --runtime claude-code
 bun run kman -a coder run --task "Refactor the auth module."
 ```
 
@@ -87,6 +89,7 @@ Cycle protection lives in the daemon: it walks each task's parent links to rejec
 │   ├── daemon                     # @kman/daemon — resident task daemon, scheduler, IPC, OS hosts
 │   ├── skills                     # @kman/skills — fetch + vendor SKILL.md sources
 │   ├── backend-base               # @kman/backend-base — spawn helpers
+│   ├── backend-pi                 # @kman/backend-pi — embedded pi SDK runtime (default)
 │   ├── backend-claude-code        # @kman/backend-claude-code
 │   ├── backend-copilot-cli        # @kman/backend-copilot-cli
 │   └── mcp-server                 # @kman/mcp-server — exposes the agent roster as an MCP server

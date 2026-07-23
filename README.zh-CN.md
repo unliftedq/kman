@@ -4,7 +4,7 @@
 
 > 面向多 agent 协作的管理工具。名字来自 [Kingsman](https://en.wikipedia.org/wiki/Kingsman:_The_Secret_Service)：不是一个“全能助手”，而是一组各司其职、可按任务派遣的 agent。
 
-`kman` 不是模型运行时本身，而是运行时之上的统一调度层。你可以在 Claude Code、GitHub Copilot CLI 等后端之上，维护一组具名 agent（如 `orchestrator`、`developer`、`researcher`），让每个 agent 拥有独立目录、独立灵魂提示词（soul prompt）、独立 skills/hooks/MCP 配置，并在需要时精准调用。
+`kman` 不是模型运行时本身，而是运行时之上的统一调度层。默认情况下，每个 agent 运行在内置的 **pi** agent 运行时上（作为 kman 的一部分随包发布，无需安装外部 CLI）；你也可以显式选择在 Claude Code、GitHub Copilot CLI 等外部后端之上运行。你可以维护一组具名 agent（如 `orchestrator`、`developer`、`researcher`），让每个 agent 拥有独立目录、独立灵魂提示词（soul prompt）、独立 skills/hooks/MCP 配置，并在需要时精准调用。
 
 想了解设计思路与完整使用说明可查看 [docs](docs/README.md)；想直接查看已发布 CLI 说明，可跳转 **[`@unliftedq/kman`](apps/cli/README.md)**。
 
@@ -52,6 +52,7 @@
 
 | 后端 | 状态 | 说明 |
 |---|---|---|
+| `pi` | ✅ 已支持（默认） | 内置 SDK（`@earendil-works/pi-coding-agent`），无需外部 CLI |
 | `claude-code` | ✅ 已支持 | 需 `claude` 在 PATH（或设置 `KMAN_CLAUDE_BIN`） |
 | `copilot-cli` | ✅ 已支持 | 需 `copilot` 在 PATH（或设置 `KMAN_COPILOT_BIN`） |
 | `codex` / `gemini` | 规划中 | 尚未实现 |
@@ -63,7 +64,8 @@
 ```bash
 bun install
 bun run kman --help
-bun run kman agent create coder --runtime claude-code
+bun run kman agent create coder            # 默认使用内置 pi 运行时
+bun run kman agent create reviewer --runtime claude-code
 bun run kman -a coder run --task "Refactor the auth module."
 ```
 
@@ -93,6 +95,7 @@ kman mcp config
 │   ├── core                       # @kman/core
 │   ├── skills                     # @kman/skills
 │   ├── backend-base               # @kman/backend-base
+│   ├── backend-pi                 # @kman/backend-pi — 内置 pi SDK 运行时（默认）
 │   ├── backend-claude-code        # @kman/backend-claude-code
 │   ├── backend-copilot-cli        # @kman/backend-copilot-cli
 │   └── mcp-server                 # @kman/mcp-server

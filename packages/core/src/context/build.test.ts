@@ -26,7 +26,7 @@ describe('buildContext', () => {
     const profile = defaultProfile('coder');
     const ctx = await buildContext(profile);
     expect(ctx.soulPrompt).toBe('soul body\n');
-    expect(ctx.backend).toBe('claude-code');
+    expect(ctx.backend).toBe('pi');
     expect(ctx.permission).toBe('ask');
     expect(ctx.outputFormat).toBe('text');
     expect(ctx.stream).toBe(false);

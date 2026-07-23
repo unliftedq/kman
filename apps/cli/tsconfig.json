@@ -16,6 +16,7 @@
     { "path": "../../packages/skills" },
     { "path": "../../packages/backend-base" },
     { "path": "../../packages/backend-claude-code" },
-    { "path": "../../packages/backend-copilot-cli" }
+    { "path": "../../packages/backend-copilot-cli" },
+    { "path": "../../packages/backend-pi" }
   ]
 }

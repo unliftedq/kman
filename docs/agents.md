@@ -41,8 +41,8 @@ name        = "coder"
 description = "Senior backend engineer agent"
 
 [runtime]
-default = "claude-code"                  # claude-code | copilot-cli in v1
-model   = "claude-sonnet-4.5"            # passed to backend; backend default if omitted
+default = "pi"                           # pi (embedded, default) | claude-code | copilot-cli
+model   = "gpt-5"                        # passed to backend; backend default if omitted
 
 [soul]
 prompt_file = "soul.md"                  # relative to agent dir; default "soul.md"

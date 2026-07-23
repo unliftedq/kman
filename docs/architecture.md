@@ -16,7 +16,7 @@ flowchart LR
     daemon --> core[packages/core<br/>profile + context + launcher]
     core -->|build| ctx[AgentContext]
     ctx --> prep[Prepare runtime files<br/>for selected agent]
-    prep --> backend[Runtime launcher<br/>claude-code / copilot-cli]
+    prep --> backend[Runtime launcher<br/>pi / claude-code / copilot-cli]
     backend -->|stdout / stderr| log[(task log)]
     user -->|kman task logs / get| log
 ```
@@ -75,6 +75,7 @@ kman/
 │   ├── core/                         # @kman/core — profile, context, prompt, launcher, doctor
 │   ├── skills/                       # @kman/skills — source parsing + SKILL.md discovery + vendoring
 │   ├── backend-base/                 # @kman/backend-base — spawn helpers
+│   ├── backend-pi/                    # @kman/backend-pi — embedded pi SDK runtime (default)
 │   ├── backend-claude-code/          # @kman/backend-claude-code
 │   ├── backend-copilot-cli/          # @kman/backend-copilot-cli
 │   └── mcp-server/                   # @kman/mcp-server — stdio MCP server + auto-injection config

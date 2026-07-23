@@ -6,7 +6,7 @@ import type {
   Profile,
 } from '@kman/types';
 
-export const KNOWN_BACKENDS: readonly BackendName[] = ['claude-code', 'copilot-cli'];
+export const KNOWN_BACKENDS: readonly BackendName[] = ['pi', 'claude-code', 'copilot-cli'];
 export const PERMISSION_LEVELS: readonly PermissionLevel[] = ['ask', 'auto', 'yolo'];
 export const OUTPUT_FORMATS: readonly OutputFormat[] = ['text', 'json', 'stream-json'];
 
@@ -20,7 +20,7 @@ export function defaultProfile(name: string, overrides: Partial<Profile> = {}): 
     name,
     description: overrides.description,
     runtime: {
-      default: overrides.runtime?.default ?? 'claude-code',
+      default: overrides.runtime?.default ?? 'pi',
       ...(overrides.runtime?.model !== undefined ? { model: overrides.runtime.model } : {}),
     },
     soul: {
